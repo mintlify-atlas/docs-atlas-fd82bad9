@@ -1,0 +1,94 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Thred SDK",
+  "projectDescription": "TypeScript SDK for AI-powered response generation with intelligent brand enrichment and affiliate integration",
+  "theme": "palm",
+  "primaryColor": "#e7642d",
+  "lightColor": "#1c1f1d",
+  "darkColor": "#72d6cb",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/streaming",
+              "guides/conversation-context",
+              "guides/dom-integration",
+              "guides/error-handling",
+              "guides/best-practices"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Client",
+            "pages": [
+              "api/client-configuration",
+              "api/answer",
+              "api/answer-stream",
+              "api/answer-stream-generator"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "api/types/answer-request",
+              "api/types/answer-response",
+              "api/types/brand-info",
+              "api/types/targets"
+            ]
+          },
+          {
+            "group": "Error Handling",
+            "pages": [
+              "api/errors/overview",
+              "api/errors/error-types"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "AI response generation powered by OpenAI GPT models",
+    "Smart brand enrichment with relevant recommendations",
+    "Real-time streaming responses with multiple patterns",
+    "Built-in affiliate integration and tracking",
+    "Conversation context across multiple interactions",
+    "Full TypeScript support with comprehensive types",
+    "Direct DOM manipulation for web applications",
+    "Robust error handling with specific error classes"
+  ],
+  "publicApiSurface": [
+    "ThredClient",
+    "answer()",
+    "answerStream()",
+    "answerStreamGenerator()",
+    "setResponse()",
+    "ThredConfig",
+    "AnswerRequest",
+    "AnswerResponse",
+    "BrandInfo",
+    "Targets",
+    "ThredError",
+    "AuthenticationError",
+    "ValidationError",
+    "ServerError",
+    "NetworkError",
+    "TimeoutError"
+  ]
+}
