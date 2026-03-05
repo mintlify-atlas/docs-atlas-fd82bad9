@@ -1,0 +1,141 @@
+---
+title: Message
+description: Message type for conversation history in the Thred SDK
+---
+
+## Overview
+
+The `Message` type represents a single message in a conversation history. It's used with the `previousMessages` parameter to provide explicit conversation context to the AI.
+
+## Type Definition
+
+```typescript
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+};
+```
+
+## Properties
+
+<ParamField path="role" type="'user' | 'assistant'" required>
+  The role of the message sender. Use `"user"` for user messages and `"assistant"` for AI responses.
+</ParamField>
+
+<ParamField path="content" type="string" required>
+  The text content of the message.
+</ParamField>
+
+## Usage
+
+The `Message` type is used in the `previousMessages` array parameter to provide conversation history:
+
+```typescript
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+const response = await client.answer({
+  message: 'What features should I look for?',
+  previousMessages: [
+    {
+      role: 'user',
+      content: 'I need a CRM for my small business',
+    },
+    {
+      role: 'assistant',
+      content: 'I recommend looking at HubSpot or Salesforce for small businesses. Both offer great features and scalability.',
+    },
+  ],
+});
+```
+
+## Multi-Turn Conversation Example
+
+Build a conversation with alternating user and assistant messages:
+
+```typescript
+const conversationHistory = [
+  {
+    role: 'user',
+    content: 'What project management tools do you recommend?',
+  },
+  {
+    role: 'assistant',
+    content: 'I recommend Asana, Trello, or Monday.com for project management.',
+  },
+  {
+    role: 'user',
+    content: 'Which one is best for remote teams?',
+  },
+  {
+    role: 'assistant',
+    content: 'Monday.com is particularly well-suited for remote teams due to its robust collaboration features.',
+  },
+];
+
+// Continue the conversation
+const response = await client.answer({
+  message: 'Does it integrate with Slack?',
+  previousMessages: conversationHistory,
+});
+```
+
+## Building Conversation Arrays
+
+Programmatically build conversation history:
+
+```typescript
+const messages: Message[] = [];
+
+// Add user message
+messages.push({
+  role: 'user',
+  content: 'What are the best productivity apps?',
+});
+
+// Add assistant response
+messages.push({
+  role: 'assistant',
+  content: 'Popular productivity apps include Notion, Todoist, and Evernote...',
+});
+
+// Continue conversation with context
+const response = await client.answer({
+  message: 'Which one is best for note-taking?',
+  previousMessages: messages,
+});
+
+// Add the new response to history
+messages.push(
+  { role: 'user', content: 'Which one is best for note-taking?' },
+  { role: 'assistant', content: response.response }
+);
+```
+
+## Best Practices
+
+<Tip>
+Keep conversation history focused on relevant context. Very long conversation histories may impact performance and exceed token limits.
+</Tip>
+
+<Warning>
+Always alternate between `user` and `assistant` roles. The SDK expects a valid conversation flow.
+</Warning>
+
+<Note>
+The `previousMessages` parameter provides explicit control over conversation context, while `conversationId` allows the API to manage context automatically. Choose the approach that best fits your use case.
+</Note>
+
+## Related Types
+
+<CardGroup cols={2}>
+  <Card title="AnswerRequest" icon="message" href="/api/types/answer-request">
+    See how Message is used in request parameters
+  </Card>
+  <Card title="Conversation Context Guide" icon="comments" href="/guides/conversation-context">
+    Learn conversation management strategies
+  </Card>
+</CardGroup>
