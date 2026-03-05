@@ -1,0 +1,637 @@
+---
+title: 'Best Practices'
+description: 'Production-ready patterns and recommendations for optimal Thred SDK usage'
+---
+
+## Overview
+
+This guide covers best practices for using the Thred SDK in production applications, including security, performance optimization, error handling, and architectural patterns.
+
+## Security Best Practices
+
+### API Key Management
+
+Never hardcode API keys in your source code. Always use environment variables or secure configuration management.
+
+<Tabs>
+  <Tab title="Good">
+    ```typescript
+    // ✅ Use environment variables
+    const client = new ThredClient({
+      apiKey: process.env.THRED_API_KEY!,
+      defaultModel: 'gpt-4',
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Bad">
+    ```typescript
+    // ❌ Never hardcode API keys
+    const client = new ThredClient({
+      apiKey: 'sk_live_1234567890abcdef',
+      defaultModel: 'gpt-4',
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Environment Variable Setup
+
+<CodeGroup>
+
+```bash .env
+# .env file (add to .gitignore!)
+THRED_API_KEY=your_api_key_here
+```
+
+```typescript Next.js
+// Next.js - next.config.js
+module.exports = {
+  env: {
+    THRED_API_KEY: process.env.THRED_API_KEY,
+  },
+};
+
+// Usage in components
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+```
+
+```typescript React (Vite)
+// Vite - .env
+VITE_THRED_API_KEY=your_api_key_here
+
+// Usage
+const client = new ThredClient({
+  apiKey: import.meta.env.VITE_THRED_API_KEY,
+});
+```
+
+```typescript Node.js
+// Node.js with dotenv
+import 'dotenv/config';
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+```
+
+</CodeGroup>
+
+### Server-Side vs Client-Side
+
+<Warning>
+**Important**: Never expose your API key in client-side code that gets sent to the browser. Always make API calls from your backend.
+</Warning>
+
+```typescript
+// ✅ Good - Server-side API route (Next.js example)
+// app/api/ai/route.ts
+import { ThredClient } from '@thred-apps/thred-js';
+import { NextRequest, NextResponse } from 'next/server';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!, // Safe - server-side only
+});
+
+export async function POST(request: NextRequest) {
+  const { message } = await request.json();
+  
+  try {
+    const response = await client.answer({ message });
+    return NextResponse.json(response);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to get response' },
+      { status: 500 }
+    );
+  }
+}
+
+// Client-side code
+// app/components/Chat.tsx
+async function askQuestion(message: string) {
+  const response = await fetch('/api/ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  
+  return response.json();
+}
+```
+
+## Performance Optimization
+
+### Timeout Configuration
+
+Configure timeouts based on your use case and expected response times.
+
+```typescript
+// For quick responses
+const quickClient = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+  timeout: 15000, // 15 seconds
+  defaultModel: 'gpt-3.5-turbo',
+});
+
+// For complex queries
+const complexClient = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+  timeout: 60000, // 60 seconds
+  defaultModel: 'gpt-4',
+});
+```
+
+### Streaming for Long Responses
+
+Always use streaming for queries that will generate long responses to improve perceived performance.
+
+```typescript
+// ✅ Good - Use streaming for long content
+await client.answerStream(
+  {
+    message: 'Write a comprehensive guide to project management',
+    model: 'gpt-4',
+    maxTokens: 2000,
+  },
+  (text) => {
+    // Update UI in real-time
+    updateUI(text);
+  }
+);
+
+// ❌ Less ideal - Non-streaming for long responses
+const response = await client.answer({
+  message: 'Write a comprehensive guide to project management',
+  model: 'gpt-4',
+  maxTokens: 2000,
+});
+// User waits for entire response before seeing anything
+```
+
+### Model Selection
+
+Choose the appropriate model based on your requirements:
+
+<Tabs>
+  <Tab title="GPT-4">
+    **Best for:**
+    - Complex reasoning tasks
+    - Detailed analysis
+    - High-quality content generation
+    - When accuracy is critical
+    
+    **Trade-offs:**
+    - Slower response time
+    - Higher cost
+    - Better for quality over speed
+    
+    ```typescript
+    const response = await client.answer({
+      message: 'Analyze the pros and cons of different CRM systems',
+      model: 'gpt-4',
+      temperature: 0.7,
+    });
+    ```
+  </Tab>
+  
+  <Tab title="GPT-4 Turbo">
+    **Best for:**
+    - Balance of quality and speed
+    - Most general use cases
+    - Production applications
+    - Cost-effective quality
+    
+    ```typescript
+    const response = await client.answer({
+      message: 'What are the best productivity tools?',
+      model: 'gpt-4-turbo',
+    });
+    ```
+  </Tab>
+  
+  <Tab title="GPT-3.5 Turbo">
+    **Best for:**
+    - Quick responses
+    - Simple queries
+    - High-volume applications
+    - Budget-conscious deployments
+    
+    **Trade-offs:**
+    - Less detailed responses
+    - May miss nuance
+    - Great for speed and cost
+    
+    ```typescript
+    const response = await client.answer({
+      message: 'What is CRM?',
+      model: 'gpt-3.5-turbo',
+      maxTokens: 150,
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Caching Strategies
+
+Implement caching for frequently asked questions:
+
+```typescript
+class CachedThredClient {
+  private client: ThredClient;
+  private cache: Map<string, { response: AnswerResponse; timestamp: number }> = new Map();
+  private cacheTTL = 3600000; // 1 hour in milliseconds
+
+  constructor(apiKey: string) {
+    this.client = new ThredClient({ apiKey });
+  }
+
+  async answer(request: AnswerRequest): Promise<AnswerResponse> {
+    const cacheKey = this.getCacheKey(request);
+    const cached = this.cache.get(cacheKey);
+
+    // Return cached response if still valid
+    if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
+      console.log('Cache hit');
+      return cached.response;
+    }
+
+    // Get fresh response
+    const response = await this.client.answer(request);
+    
+    // Cache the response
+    this.cache.set(cacheKey, {
+      response,
+      timestamp: Date.now(),
+    });
+
+    return response;
+  }
+
+  private getCacheKey(request: AnswerRequest): string {
+    return JSON.stringify({
+      message: request.message,
+      model: request.model,
+      instructions: request.instructions,
+    });
+  }
+
+  clearCache(): void {
+    this.cache.clear();
+  }
+}
+
+// Usage
+const cachedClient = new CachedThredClient(process.env.THRED_API_KEY!);
+const response = await cachedClient.answer({ message: 'What is CRM?' });
+```
+
+## Conversation Context Management
+
+### Use Conversation ID for Simple Cases
+
+```typescript
+// ✅ Good - Simple conversation tracking
+const convId = `conv_${userId}_${Date.now()}`;
+
+await client.answer({ message: 'I need a CRM', conversationId: convId });
+await client.answer({ message: 'What features?', conversationId: convId });
+await client.answer({ message: 'How much?', conversationId: convId });
+```
+
+### Use Previous Messages for Complex Cases
+
+```typescript
+// ✅ Good - Full control over conversation history
+const messages: Message[] = [];
+
+const r1 = await client.answer({ message: 'I need a CRM', previousMessages: messages });
+messages.push(
+  { role: 'user', content: 'I need a CRM' },
+  { role: 'assistant', content: r1.response }
+);
+
+const r2 = await client.answer({ message: 'What features?', previousMessages: messages });
+messages.push(
+  { role: 'user', content: 'What features?' },
+  { role: 'assistant', content: r2.response }
+);
+```
+
+### Limit Conversation History
+
+```typescript
+// Prevent token limit issues by limiting history
+function limitConversationHistory(messages: Message[], maxMessages = 10): Message[] {
+  if (messages.length <= maxMessages) {
+    return messages;
+  }
+  
+  // Keep the most recent messages
+  return messages.slice(-maxMessages);
+}
+
+const limitedMessages = limitConversationHistory(allMessages, 10);
+const response = await client.answer({
+  message: 'New question',
+  previousMessages: limitedMessages,
+});
+```
+
+## Error Handling Best Practices
+
+### Comprehensive Error Handling
+
+```typescript
+import {
+  ThredClient,
+  AuthenticationError,
+  ValidationError,
+  ServerError,
+  NetworkError,
+  TimeoutError,
+} from '@thred-apps/thred-js';
+
+async function robustAnswer(message: string): Promise<string> {
+  try {
+    const response = await client.answer({ message });
+    return response.response;
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      // Critical: Log and alert
+      console.error('Authentication failed - check API key');
+      throw new Error('Service configuration error');
+    } else if (error instanceof ValidationError) {
+      // User error: Show friendly message
+      throw new Error('Invalid input. Please check your message.');
+    } else if (error instanceof TimeoutError) {
+      // Retry with streaming
+      return await getStreamingResponse(message);
+    } else if (error instanceof NetworkError) {
+      // Transient: Retry with backoff
+      return await retryWithBackoff(() => client.answer({ message }));
+    } else if (error instanceof ServerError) {
+      // Transient: Retry with backoff
+      return await retryWithBackoff(() => client.answer({ message }));
+    } else {
+      // Unexpected: Log and throw
+      console.error('Unexpected error:', error);
+      throw new Error('An unexpected error occurred');
+    }
+  }
+}
+```
+
+### Retry with Exponential Backoff
+
+```typescript
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelay = 1000
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Don't retry on auth/validation errors
+      if (
+        error instanceof AuthenticationError ||
+        error instanceof ValidationError
+      ) {
+        throw error;
+      }
+      
+      if (i < maxRetries - 1) {
+        const delay = baseDelay * Math.pow(2, i);
+        console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms`);
+        await sleep(delay);
+      }
+    }
+  }
+  
+  throw lastError!;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+```
+
+## Client Initialization Patterns
+
+### Singleton Pattern
+
+```typescript
+// lib/thred.ts
+import { ThredClient } from '@thred-apps/thred-js';
+
+let clientInstance: ThredClient | null = null;
+
+export function getThredClient(): ThredClient {
+  if (!clientInstance) {
+    clientInstance = new ThredClient({
+      apiKey: process.env.THRED_API_KEY!,
+      defaultModel: 'gpt-4-turbo',
+      timeout: 30000,
+    });
+  }
+  return clientInstance;
+}
+
+// Usage across your app
+import { getThredClient } from '@/lib/thred';
+
+const client = getThredClient();
+const response = await client.answer({ message: 'test' });
+```
+
+### Dependency Injection
+
+```typescript
+// services/AIService.ts
+export class AIService {
+  constructor(private client: ThredClient) {}
+
+  async getResponse(message: string): Promise<string> {
+    const response = await this.client.answer({ message });
+    return response.response;
+  }
+
+  async streamResponse(
+    message: string,
+    onChunk: (text: string) => void
+  ): Promise<void> {
+    await this.client.answerStream({ message }, onChunk);
+  }
+}
+
+// app.ts
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+const aiService = new AIService(client);
+```
+
+## Testing Best Practices
+
+### Mock the Client for Testing
+
+```typescript
+// __mocks__/@thred-apps/thred-js.ts
+export class ThredClient {
+  async answer(request: any) {
+    return {
+      response: 'Mocked response',
+      metadata: {
+        brandUsed: null,
+        code: 'mock_code',
+      },
+    };
+  }
+
+  async answerStream(
+    request: any,
+    onChunk: (text: string) => void
+  ) {
+    onChunk('Mocked streaming response');
+    return {
+      response: 'Mocked streaming response',
+      metadata: { brandUsed: null },
+    };
+  }
+}
+
+// test.ts
+jest.mock('@thred-apps/thred-js');
+
+import { ThredClient } from '@thred-apps/thred-js';
+
+test('should get AI response', async () => {
+  const client = new ThredClient({ apiKey: 'test' });
+  const response = await client.answer({ message: 'test' });
+  
+  expect(response.response).toBe('Mocked response');
+});
+```
+
+### Integration Testing
+
+```typescript
+// Use a test API key for integration tests
+const testClient = new ThredClient({
+  apiKey: process.env.THRED_TEST_API_KEY!,
+  timeout: 10000,
+});
+
+describe('Thred Integration Tests', () => {
+  it('should get a real response', async () => {
+    const response = await testClient.answer({
+      message: 'What is CRM?',
+      model: 'gpt-3.5-turbo',
+    });
+    
+    expect(response.response).toBeDefined();
+    expect(response.response.length).toBeGreaterThan(0);
+  }, 15000); // Longer timeout for API calls
+});
+```
+
+## Monitoring and Logging
+
+### Request Logging
+
+```typescript
+class LoggedThredClient {
+  private client: ThredClient;
+
+  constructor(apiKey: string) {
+    this.client = new ThredClient({ apiKey });
+  }
+
+  async answer(request: AnswerRequest): Promise<AnswerResponse> {
+    const startTime = Date.now();
+    
+    try {
+      console.log('Thred API Request:', {
+        message: request.message.substring(0, 100),
+        model: request.model,
+        timestamp: new Date().toISOString(),
+      });
+      
+      const response = await this.client.answer(request);
+      
+      console.log('Thred API Response:', {
+        duration: Date.now() - startTime,
+        responseLength: response.response.length,
+        brandUsed: response.metadata.brandUsed?.name,
+        timestamp: new Date().toISOString(),
+      });
+      
+      return response;
+    } catch (error) {
+      console.error('Thred API Error:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - startTime,
+        timestamp: new Date().toISOString(),
+      });
+      
+      throw error;
+    }
+  }
+}
+```
+
+## Summary Checklist
+
+<Tip>
+Use this checklist to ensure your Thred SDK implementation follows best practices:
+</Tip>
+
+**Security:**
+- [ ] API keys stored in environment variables
+- [ ] API calls made from server-side only
+- [ ] No API keys in client-side code
+- [ ] Environment files in `.gitignore`
+
+**Performance:**
+- [ ] Appropriate timeout configured
+- [ ] Streaming used for long responses
+- [ ] Correct model selected for use case
+- [ ] Caching implemented for repeated queries
+
+**Error Handling:**
+- [ ] Specific error types caught and handled
+- [ ] Retry logic for transient failures
+- [ ] User-friendly error messages
+- [ ] Errors logged for debugging
+
+**Conversation Management:**
+- [ ] Conversation IDs or previous messages used
+- [ ] History limited to prevent token issues
+- [ ] Context cleared when appropriate
+
+**Code Quality:**
+- [ ] TypeScript types used
+- [ ] Client initialized as singleton or via DI
+- [ ] Tests written (unit and integration)
+- [ ] Monitoring and logging implemented
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="code" href="/api/client-configuration">
+    Explore detailed API documentation
+  </Card>
+  <Card title="Error Handling" icon="shield" href="/guides/error-handling">
+    Learn comprehensive error handling strategies
+  </Card>
+</CardGroup>

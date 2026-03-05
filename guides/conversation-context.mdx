@@ -1,0 +1,540 @@
+---
+title: 'Conversation Context'
+description: 'Maintain context across multiple interactions for coherent multi-turn conversations'
+---
+
+## Overview
+
+Maintaining conversation context is essential for creating natural, coherent multi-turn conversations with the Thred SDK. The SDK provides two powerful mechanisms for preserving context:
+
+1. **Conversation ID** - Simple session tracking
+2. **Previous Messages** - Explicit conversation history
+
+Both approaches enable the AI to understand the full context of the conversation and provide relevant, contextually-aware responses.
+
+## Using Conversation ID
+
+The `conversationId` parameter allows you to track related messages across multiple API calls without manually managing conversation history.
+
+### Basic Usage
+
+```typescript
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+const conversationId = `conv_${Date.now()}`;
+
+// First message
+const response1 = await client.answer({
+  message: 'What email marketing tool do you recommend?',
+  conversationId,
+});
+
+console.log(response1.response);
+
+// Follow-up question - context is automatically maintained
+const response2 = await client.answer({
+  message: 'Does it integrate with Shopify?',
+  conversationId, // Same conversation ID
+});
+
+console.log(response2.response);
+// The AI knows "it" refers to the email marketing tool from the first message
+```
+
+### Generating Conversation IDs
+
+<Tabs>
+  <Tab title="Timestamp-Based">
+    ```typescript
+    // Simple timestamp-based ID
+    const conversationId = `conv_${Date.now()}`;
+    ```
+  </Tab>
+  
+  <Tab title="UUID">
+    ```typescript
+    import { v4 as uuidv4 } from 'uuid';
+    
+    const conversationId = `conv_${uuidv4()}`;
+    ```
+  </Tab>
+  
+  <Tab title="User-Based">
+    ```typescript
+    // Combine user ID with session
+    const conversationId = `user_${userId}_${Date.now()}`;
+    ```
+  </Tab>
+</Tabs>
+
+### Multi-Turn Conversation Example
+
+```typescript
+class ConversationManager {
+  private client: ThredClient;
+  private conversationId: string;
+  private messageHistory: Array<{ role: string; content: string }> = [];
+
+  constructor(apiKey: string) {
+    this.client = new ThredClient({ apiKey });
+    this.conversationId = this.generateConversationId();
+  }
+
+  private generateConversationId(): string {
+    return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  async sendMessage(message: string): Promise<string> {
+    // Store user message
+    this.messageHistory.push({ role: 'user', content: message });
+
+    // Send with conversation ID
+    const response = await this.client.answer({
+      message,
+      conversationId: this.conversationId,
+      model: 'gpt-4',
+    });
+
+    // Store assistant response
+    this.messageHistory.push({ role: 'assistant', content: response.response });
+
+    return response.response;
+  }
+
+  getHistory() {
+    return this.messageHistory;
+  }
+
+  reset() {
+    this.conversationId = this.generateConversationId();
+    this.messageHistory = [];
+  }
+}
+
+// Usage
+const conversation = new ConversationManager(process.env.THRED_API_KEY!);
+
+await conversation.sendMessage('I need a CRM for my small business');
+await conversation.sendMessage('What features does it have?');
+await conversation.sendMessage('How much does it cost?');
+
+console.log(conversation.getHistory());
+```
+
+## Using Previous Messages
+
+The `previousMessages` parameter gives you explicit control over the conversation history sent to the API.
+
+### Type Definition
+
+```typescript
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+type AnswerRequest = {
+  message: string;
+  previousMessages?: Message[];
+  // ... other options
+};
+```
+
+### Basic Example
+
+```typescript
+const response = await client.answer({
+  message: 'What features should I look for?',
+  previousMessages: [
+    {
+      role: 'user',
+      content: 'I need a CRM for my small business',
+    },
+    {
+      role: 'assistant',
+      content: 'I recommend looking at HubSpot or Salesforce. Both offer excellent CRM solutions for small businesses with different pricing tiers.',
+    },
+  ],
+});
+
+console.log(response.response);
+// AI understands the context and provides relevant features
+```
+
+### Building Conversation History
+
+```typescript
+class ChatSession {
+  private client: ThredClient;
+  private messages: Message[] = [];
+
+  constructor(apiKey: string) {
+    this.client = new ThredClient({ apiKey });
+  }
+
+  async chat(userMessage: string): Promise<string> {
+    // Get response with full conversation history
+    const response = await this.client.answer({
+      message: userMessage,
+      previousMessages: this.messages,
+      model: 'gpt-4-turbo',
+    });
+
+    // Add both messages to history
+    this.messages.push(
+      { role: 'user', content: userMessage },
+      { role: 'assistant', content: response.response }
+    );
+
+    return response.response;
+  }
+
+  getMessages(): Message[] {
+    return [...this.messages];
+  }
+
+  clearHistory(): void {
+    this.messages = [];
+  }
+}
+
+// Usage
+const session = new ChatSession(process.env.THRED_API_KEY!);
+
+const response1 = await session.chat('What project management tool do you recommend?');
+console.log('AI:', response1);
+
+const response2 = await session.chat('Does it have time tracking?');
+console.log('AI:', response2);
+
+const response3 = await session.chat('What about team collaboration features?');
+console.log('AI:', response3);
+```
+
+## Conversation ID vs Previous Messages
+
+<Tabs>
+  <Tab title="Conversation ID">
+    ### Advantages
+    
+    - **Simpler implementation** - Just pass the same ID
+    - **Server-side tracking** - History managed by API
+    - **Automatic context** - No manual message management
+    
+    ### Best For
+    
+    - Simple chat applications
+    - When you don't need to manipulate history
+    - Reducing client-side complexity
+    
+    ```typescript
+    // Simple and clean
+    const convId = generateId();
+    
+    await client.answer({ message: 'Question 1', conversationId: convId });
+    await client.answer({ message: 'Question 2', conversationId: convId });
+    await client.answer({ message: 'Question 3', conversationId: convId });
+    ```
+  </Tab>
+  
+  <Tab title="Previous Messages">
+    ### Advantages
+    
+    - **Full control** - Manage exactly what context is sent
+    - **History editing** - Can modify or truncate history
+    - **Offline capable** - Store and replay conversations
+    - **Multi-device** - Sync history across devices
+    
+    ### Best For
+    
+    - Complex conversation management
+    - When you need to edit or filter history
+    - Implementing features like "edit message"
+    - Token/cost optimization
+    
+    ```typescript
+    const messages: Message[] = [];
+    
+    const r1 = await client.answer({ message: 'Q1', previousMessages: messages });
+    messages.push(
+      { role: 'user', content: 'Q1' },
+      { role: 'assistant', content: r1.response }
+    );
+    
+    const r2 = await client.answer({ message: 'Q2', previousMessages: messages });
+    messages.push(
+      { role: 'user', content: 'Q2' },
+      { role: 'assistant', content: r2.response }
+    );
+    ```
+  </Tab>
+</Tabs>
+
+## Combining Both Approaches
+
+You can use both `conversationId` and `previousMessages` together:
+
+```typescript
+const conversationId = 'conv_123';
+const previousMessages: Message[] = [
+  { role: 'user', content: 'Previous question' },
+  { role: 'assistant', content: 'Previous answer' },
+];
+
+const response = await client.answer({
+  message: 'New question',
+  conversationId,        // For server-side tracking
+  previousMessages,      // For explicit context
+  model: 'gpt-4',
+});
+```
+
+<Info>
+When both are provided, `previousMessages` takes precedence for context, while `conversationId` is still used for tracking and analytics.
+</Info>
+
+## Streaming with Context
+
+Conversation context works seamlessly with streaming:
+
+```typescript
+const conversationId = `conv_${Date.now()}`;
+
+// First streaming message
+await client.answerStream(
+  {
+    message: 'Tell me about productivity apps',
+    conversationId,
+  },
+  (text) => console.log(text)
+);
+
+// Follow-up streaming message with context
+await client.answerStream(
+  {
+    message: 'Which one is best for remote teams?',
+    conversationId,
+  },
+  (text) => console.log(text)
+);
+```
+
+## Advanced Patterns
+
+### Context Window Management
+
+Manage conversation history to stay within token limits:
+
+```typescript
+class ContextManager {
+  private messages: Message[] = [];
+  private readonly maxMessages = 10; // Keep last 10 messages
+
+  addMessage(role: 'user' | 'assistant', content: string): void {
+    this.messages.push({ role, content });
+    
+    // Keep only recent messages
+    if (this.messages.length > this.maxMessages) {
+      this.messages = this.messages.slice(-this.maxMessages);
+    }
+  }
+
+  getContext(): Message[] {
+    return [...this.messages];
+  }
+
+  // Truncate to fit token budget (rough estimate)
+  getContextWithinTokenLimit(maxTokens: number): Message[] {
+    const avgCharsPerToken = 4;
+    const maxChars = maxTokens * avgCharsPerToken;
+    
+    let totalChars = 0;
+    const truncated: Message[] = [];
+    
+    // Add messages from most recent backwards
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      const msg = this.messages[i];
+      const msgChars = msg.content.length;
+      
+      if (totalChars + msgChars > maxChars) {
+        break;
+      }
+      
+      truncated.unshift(msg);
+      totalChars += msgChars;
+    }
+    
+    return truncated;
+  }
+}
+```
+
+### Conversation Branching
+
+Create branches in conversations for exploring different paths:
+
+```typescript
+class BranchedConversation {
+  private branches: Map<string, Message[]> = new Map();
+  private currentBranch = 'main';
+
+  createBranch(name: string, fromBranch = 'main'): void {
+    const sourceMessages = this.branches.get(fromBranch) || [];
+    this.branches.set(name, [...sourceMessages]);
+  }
+
+  switchBranch(name: string): void {
+    if (!this.branches.has(name)) {
+      this.branches.set(name, []);
+    }
+    this.currentBranch = name;
+  }
+
+  async sendMessage(client: ThredClient, message: string): Promise<string> {
+    const messages = this.branches.get(this.currentBranch) || [];
+    
+    const response = await client.answer({
+      message,
+      previousMessages: messages,
+    });
+
+    messages.push(
+      { role: 'user', content: message },
+      { role: 'assistant', content: response.response }
+    );
+
+    this.branches.set(this.currentBranch, messages);
+    return response.response;
+  }
+}
+
+// Usage
+const branched = new BranchedConversation();
+
+await branched.sendMessage(client, 'I need project management software');
+
+// Explore different options in different branches
+branched.createBranch('option-a', 'main');
+await branched.sendMessage(client, 'Tell me more about Asana');
+
+branched.createBranch('option-b', 'main');
+branched.switchBranch('option-b');
+await branched.sendMessage(client, 'Tell me more about Monday.com');
+```
+
+### Persistent Conversations
+
+Save and restore conversations:
+
+```typescript
+class PersistentConversation {
+  private conversationId: string;
+  private messages: Message[] = [];
+
+  constructor(conversationId?: string) {
+    this.conversationId = conversationId || this.generateId();
+    this.loadFromStorage();
+  }
+
+  private generateId(): string {
+    return `conv_${Date.now()}`;
+  }
+
+  private loadFromStorage(): void {
+    const stored = localStorage.getItem(this.conversationId);
+    if (stored) {
+      this.messages = JSON.parse(stored);
+    }
+  }
+
+  private saveToStorage(): void {
+    localStorage.setItem(this.conversationId, JSON.stringify(this.messages));
+  }
+
+  async chat(client: ThredClient, message: string): Promise<string> {
+    const response = await client.answer({
+      message,
+      conversationId: this.conversationId,
+      previousMessages: this.messages,
+    });
+
+    this.messages.push(
+      { role: 'user', content: message },
+      { role: 'assistant', content: response.response }
+    );
+
+    this.saveToStorage();
+    return response.response;
+  }
+
+  getId(): string {
+    return this.conversationId;
+  }
+
+  clear(): void {
+    this.messages = [];
+    localStorage.removeItem(this.conversationId);
+  }
+}
+
+// Usage - conversation persists across page reloads
+const conversation = new PersistentConversation();
+await conversation.chat(client, 'Hello!');
+```
+
+## Best Practices
+
+<Tip>
+**Conversation ID Naming**: Use a consistent, descriptive naming convention like `conv_{userId}_{timestamp}` for easier debugging and analytics.
+</Tip>
+
+1. **Choose the right approach**
+   - Use `conversationId` for simple applications
+   - Use `previousMessages` when you need control
+   - Combine both for complex requirements
+
+2. **Manage token limits**
+   - Monitor conversation history length
+   - Truncate old messages when necessary
+   - Estimate token usage to avoid errors
+
+3. **Handle context gracefully**
+   - Provide "start new conversation" functionality
+   - Allow users to see conversation history
+   - Handle edge cases (very long histories)
+
+4. **Optimize performance**
+   - Don't send unnecessary context
+   - Cache conversation IDs appropriately
+   - Clean up old conversations
+
+5. **Consider user experience**
+   - Show context to users (conversation history)
+   - Allow editing or deleting messages
+   - Provide conversation search/filtering
+
+## Common Pitfalls
+
+<Warning>
+**Avoid these common mistakes:**
+
+- Forgetting to maintain the same conversation ID across related messages
+- Not limiting conversation history size (can exceed token limits)
+- Mixing conversations without clearing context
+- Not handling conversation persistence across sessions
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Streaming Responses" icon="water" href="/guides/streaming">
+    Use conversation context with streaming for real-time chat
+  </Card>
+  <Card title="Best Practices" icon="star" href="/guides/best-practices">
+    Learn more about optimizing conversation management
+  </Card>
+</CardGroup>

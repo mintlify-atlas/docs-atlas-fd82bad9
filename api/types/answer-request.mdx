@@ -1,0 +1,120 @@
+---
+title: "AnswerRequest"
+description: "Request payload for generating AI responses with brand enrichment"
+---
+
+## Type Definition
+
+```typescript
+type AnswerRequest = {
+  message: string;
+  model?: "gpt-4" | "gpt-4-turbo" | "gpt-3.5-turbo";
+  maxTokens?: number;
+  temperature?: number;
+  instructions?: string;
+  conversationId?: string;
+  previousMessages?: Message[];
+};
+```
+
+## Properties
+
+<ParamField path="message" type="string" required>
+  The user's message or question to process. This is the main input that will be enriched with brand information.
+</ParamField>
+
+<ParamField path="model" type="string">
+  The OpenAI model to use for generation. Available options:
+  - `"gpt-4"` - Most capable model
+  - `"gpt-4-turbo"` - Faster GPT-4 variant
+  - `"gpt-3.5-turbo"` - Fastest, most cost-effective
+  
+  **Default:** Uses the default model configured in your Thred client.
+</ParamField>
+
+<ParamField path="maxTokens" type="number">
+  Maximum number of tokens to generate in the response. This value may be overridden by brand-specific settings.
+  
+  **Default:** Determined by brand settings or API defaults.
+</ParamField>
+
+<ParamField path="temperature" type="number">
+  Sampling temperature for response generation (0-2). Lower values make output more focused and deterministic, higher values make it more creative and random. This value may be overridden by brand-specific settings.
+  
+  **Default:** Determined by brand settings or API defaults.
+</ParamField>
+
+<ParamField path="instructions" type="string">
+  Additional instructions to guide the AI response. Use this to customize tone, format, or specific requirements for the generated response.
+</ParamField>
+
+<ParamField path="conversationId" type="string">
+  Unique identifier to track conversation context across multiple requests. Use the same ID for follow-up messages in a conversation.
+</ParamField>
+
+<ParamField path="previousMessages" type="Message[]">
+  Array of previous messages in the conversation for context. Each message should have a `role` ("user" or "assistant") and `content` (string).
+</ParamField>
+
+## Examples
+
+### Basic Request
+
+```typescript
+const request: AnswerRequest = {
+  message: "What are the best running shoes for beginners?"
+};
+
+const response = await thred.answer(request);
+```
+
+### Request with Model Selection
+
+```typescript
+const request: AnswerRequest = {
+  message: "Compare different types of protein powder",
+  model: "gpt-4-turbo",
+  temperature: 0.7,
+  maxTokens: 500
+};
+
+const response = await thred.answer(request);
+```
+
+### Request with Conversation Context
+
+```typescript
+const request: AnswerRequest = {
+  message: "What about for wide feet?",
+  conversationId: "conv-123",
+  previousMessages: [
+    {
+      role: "user",
+      content: "What are the best running shoes for beginners?"
+    },
+    {
+      role: "assistant",
+      content: "For beginners, I recommend Nike Pegasus or Brooks Ghost..."
+    }
+  ]
+};
+
+const response = await thred.answer(request);
+```
+
+### Request with Custom Instructions
+
+```typescript
+const request: AnswerRequest = {
+  message: "Tell me about electric bikes",
+  instructions: "Keep the response under 100 words and focus on commuting benefits",
+  model: "gpt-3.5-turbo"
+};
+
+const response = await thred.answer(request);
+```
+
+## Related Types
+
+- [AnswerResponse](/api/types/answer-response) - Response structure returned by the API
+- [Targets](/api/types/targets) - Target elements for DOM integration

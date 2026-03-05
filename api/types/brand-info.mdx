@@ -1,0 +1,183 @@
+---
+title: "BrandInfo"
+description: "Information about a brand used in response enrichment"
+---
+
+## Type Definition
+
+```typescript
+type BrandInfo = {
+  id: string;
+  name: string;
+  domain: string;
+  image: string;
+} | null;
+```
+
+## Overview
+
+`BrandInfo` represents information about a brand that was matched and used for enriching an AI response. This type can be `null` when no brand match occurs.
+
+## Properties
+
+<ResponseField name="id" type="string" required>
+  Unique identifier for the brand in the Thred system.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Display name of the brand (e.g., "Nike", "Apple", "Amazon").
+</ResponseField>
+
+<ResponseField name="domain" type="string" required>
+  Primary domain of the brand's website (e.g., "nike.com", "apple.com").
+</ResponseField>
+
+<ResponseField name="image" type="string" required>
+  URL to the brand's logo or image asset. This can be used to display brand visuals in your UI.
+</ResponseField>
+
+## Nullable Type
+
+The `BrandInfo` type is nullable (`BrandInfo | null`). It will be `null` in the response metadata when:
+
+- No brand triggers matched the user's message
+- The similarity score was below the matching threshold
+- The message content doesn't relate to any configured brands
+
+## Examples
+
+### Brand Match Example
+
+```json
+{
+  "id": "brand-nike-123",
+  "name": "Nike",
+  "domain": "nike.com",
+  "image": "https://cdn.thred.ai/brands/nike-logo.png"
+}
+```
+
+### No Brand Match
+
+```json
+null
+```
+
+## Usage Examples
+
+### Type-Safe Brand Checking
+
+```typescript
+const { metadata } = await thred.answer({
+  message: "What are the best running shoes?"
+});
+
+if (metadata.brandUsed) {
+  // TypeScript knows brandUsed is not null here
+  console.log(`Brand: ${metadata.brandUsed.name}`);
+  console.log(`Domain: ${metadata.brandUsed.domain}`);
+  console.log(`ID: ${metadata.brandUsed.id}`);
+} else {
+  console.log("No brand was matched");
+}
+```
+
+### Displaying Brand Information
+
+```typescript
+const { response, metadata } = await thred.answer({
+  message: "Tell me about iPhone features"
+});
+
+const displayBrand = (brand: BrandInfo) => {
+  if (!brand) {
+    return "<p>No brand information available</p>";
+  }
+  
+  return `
+    <div class="brand-card">
+      <img src="${brand.image}" alt="${brand.name} logo">
+      <h3>${brand.name}</h3>
+      <p>Visit: <a href="https://${brand.domain}">${brand.domain}</a></p>
+    </div>
+  `;
+};
+
+document.getElementById("brand-info").innerHTML = displayBrand(metadata.brandUsed);
+```
+
+### Conditional Analytics Tracking
+
+```typescript
+const { metadata } = await thred.answer({
+  message: "Best laptops for programming"
+});
+
+if (metadata.brandUsed) {
+  // Track brand impression
+  analytics.track("brand_impression", {
+    brand_id: metadata.brandUsed.id,
+    brand_name: metadata.brandUsed.name,
+    similarity_score: metadata.similarityScore,
+    matched_triggers: metadata.matchedTriggers
+  });
+}
+```
+
+### Brand Logo Display Component
+
+```typescript
+interface BrandLogoProps {
+  brand: BrandInfo;
+  size?: "small" | "medium" | "large";
+}
+
+function BrandLogo({ brand, size = "medium" }: BrandLogoProps) {
+  if (!brand) return null;
+  
+  const dimensions = {
+    small: "32px",
+    medium: "64px",
+    large: "128px"
+  };
+  
+  return (
+    <img
+      src={brand.image}
+      alt={`${brand.name} logo`}
+      width={dimensions[size]}
+      height={dimensions[size]}
+      title={brand.name}
+    />
+  );
+}
+
+// Usage
+const { metadata } = await thred.answer({ message: "Running shoes" });
+return <BrandLogo brand={metadata.brandUsed} size="large" />;
+```
+
+### Filtering High-Confidence Matches
+
+```typescript
+const { metadata } = await thred.answer({
+  message: "What gaming headset should I buy?"
+});
+
+// Only show brand info if confidence is high
+const MIN_SIMILARITY_THRESHOLD = 0.75;
+
+if (metadata.brandUsed && metadata.similarityScore >= MIN_SIMILARITY_THRESHOLD) {
+  showBrandRecommendation({
+    name: metadata.brandUsed.name,
+    logo: metadata.brandUsed.image,
+    url: metadata.link,
+    confidence: metadata.similarityScore
+  });
+}
+```
+
+## Related Types
+
+- [AnswerResponse](/api/types/answer-response) - Contains BrandInfo in the metadata field
+- [AnswerRequest](/api/types/answer-request) - Request structure that triggers brand matching

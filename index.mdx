@@ -1,97 +1,122 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Thred SDK"
+description: "TypeScript SDK for AI-powered response generation with intelligent brand enrichment"
 ---
 
-## Setting up
+<div style={{
+  background: 'linear-gradient(135deg, #e7642d 0%, #72d6cb 100%)',
+  padding: '3rem 2rem',
+  borderRadius: '8px',
+  marginBottom: '2rem',
+  textAlign: 'center'
+}}>
+  <h1 style={{ color: 'white', fontSize: '3rem', fontWeight: '700', marginBottom: '1rem' }}>
+    Build AI Experiences with Brand Intelligence
+  </h1>
+  <p style={{ color: 'white', fontSize: '1.25rem', marginBottom: '2rem', opacity: 0.95 }}>
+    Generate AI responses powered by OpenAI with automatic brand enrichment and affiliate integration
+  </p>
+</div>
 
-Get your documentation site up and running in minutes.
+## Get Started in Minutes
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install the SDK with npm, yarn, or pnpm
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first AI-powered response in 5 minutes
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Key Features
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="AI Response Generation" icon="brain">
+    Leverage GPT-4, GPT-4 Turbo, and GPT-3.5 Turbo models for intelligent responses
+  </Card>
+  <Card title="Smart Brand Enrichment" icon="sparkles">
+    Automatically enrich responses with relevant brand recommendations
+  </Card>
+  <Card title="Real-time Streaming" icon="tower-broadcast">
+    Stream responses in real-time with multiple consumption patterns
+  </Card>
+  <Card title="Affiliate Integration" icon="link">
+    Built-in tracking and impression registration for affiliate programs
+  </Card>
+  <Card title="Conversation Context" icon="comments">
+    Maintain context across multiple interactions for natural conversations
+  </Card>
+  <Card title="TypeScript Support" icon="code">
+    Full TypeScript support with comprehensive type definitions
+  </Card>
+  <Card title="DOM Integration" icon="window">
+    Direct DOM manipulation for seamless web application integration
+  </Card>
+  <Card title="Error Handling" icon="shield-halved">
+    Robust error handling with specific error classes for different scenarios
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Quick Example
 
-## Need inspiration?
+```typescript
+import { ThredClient } from '@thred-apps/thred-js';
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+// Initialize the client
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY,
+  defaultModel: 'gpt-4',
+});
+
+// Generate a response
+const response = await client.answer({
+  message: 'What are the best productivity tools?',
+});
+
+console.log(response.response);
+// Brand information is automatically included
+console.log(response.metadata.brandUsed?.name);
+```
+
+## Explore the SDK
+
+<CardGroup cols={3}>
+  <Card title="Streaming Responses" icon="stream" href="/guides/streaming">
+    Learn how to use streaming for real-time responses
+  </Card>
+  <Card title="Conversation Context" icon="message" href="/guides/conversation-context">
+    Maintain context across multiple messages
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Handle errors gracefully with typed error classes
+  </Card>
+</CardGroup>
+
+## API Reference
+
+<CardGroup cols={2}>
+  <Card title="Client Configuration" icon="gear" href="/api/client-configuration">
+    Configure the ThredClient with all available options
+  </Card>
+  <Card title="Methods" icon="function" href="/api/answer">
+    Explore all available methods and their parameters
+  </Card>
+  <Card title="Types" icon="brackets-curly" href="/api/types/answer-request">
+    Complete TypeScript type definitions
+  </Card>
+  <Card title="Error Types" icon="bug" href="/api/errors/error-types">
+    All error classes and their properties
+  </Card>
+</CardGroup>
+
+## Need Help?
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/arta-eth/thred-js/issues">
+    Report bugs or request features
+  </Card>
+  <Card title="View Source" icon="code-branch" href="https://github.com/arta-eth/thred-js">
+    Explore the source code on GitHub
+  </Card>
+</CardGroup>

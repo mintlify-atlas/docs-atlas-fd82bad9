@@ -1,0 +1,419 @@
+---
+title: 'answerStreamGenerator()'
+description: 'Stream AI responses using async generators'
+---
+
+## Method Signature
+
+```typescript
+async *answerStreamGenerator(
+  request: AnswerRequest
+): AsyncGenerator<string | { metadata: AnswerResponse }, void, unknown>
+```
+
+Generate a streaming AI response with brand enrichment using async generators. This provides an alternative to `answerStream()` with a more modern async/await syntax using `for await...of` loops.
+
+## Parameters
+
+<ParamField path="request" type="AnswerRequest" required>
+  The request payload containing the user's message and optional configuration
+
+  <Expandable title="AnswerRequest properties">
+    <ParamField path="message" type="string" required>
+      The user's message or question to process. Cannot be empty or whitespace-only.
+    </ParamField>
+
+    <ParamField path="model" type="'gpt-4' | 'gpt-4-turbo' | 'gpt-3.5-turbo'">
+      The OpenAI model to use for this request. Overrides the client's `defaultModel` if specified.
+    </ParamField>
+
+    <ParamField path="maxTokens" type="number">
+      Maximum number of tokens to generate. Note: This may be overridden by brand-specific settings.
+    </ParamField>
+
+    <ParamField path="temperature" type="number">
+      Sampling temperature between 0 and 2. Higher values make output more random. Note: This may be overridden by brand-specific settings.
+    </ParamField>
+
+    <ParamField path="instructions" type="string">
+      Additional instructions to guide the AI's response style or content.
+    </ParamField>
+
+    <ParamField path="conversationId" type="string">
+      Unique ID to track conversation context across multiple requests.
+    </ParamField>
+
+    <ParamField path="previousMessages" type="Message[]">
+      Array of previous messages in the conversation for context.
+      
+      <Expandable title="Message structure">
+        <ParamField path="role" type="'user' | 'assistant'" required>
+          The role of the message sender.
+        </ParamField>
+        
+        <ParamField path="content" type="string" required>
+          The content of the message.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+Returns an `AsyncGenerator` that yields two types of values:
+
+<ResponseField name="string" type="string">
+  Accumulated response text from the beginning. Each yield contains the **full text so far**, not just the latest chunk.
+</ResponseField>
+
+<ResponseField name="{ metadata: AnswerResponse }" type="object">
+  Final object containing the complete response and metadata. This is yielded once at the end of the stream.
+  
+  <Expandable title="AnswerResponse properties">
+    <ResponseField name="response" type="string" required>
+      The complete AI response text with brand enrichment applied.
+    </ResponseField>
+
+    <ResponseField name="metadata" type="AnswerMetadata" required>
+      Metadata about the response and brand enrichment
+      
+      <Expandable title="AnswerMetadata properties">
+        <ResponseField name="brandUsed" type="BrandInfo | null">
+          Information about the brand used for enrichment
+          
+          <Expandable title="BrandInfo properties">
+            <ResponseField name="id" type="string">
+              Unique identifier for the brand
+            </ResponseField>
+            
+            <ResponseField name="name" type="string">
+              Name of the brand
+            </ResponseField>
+            
+            <ResponseField name="domain" type="string">
+              Domain of the brand's website
+            </ResponseField>
+            
+            <ResponseField name="image" type="string">
+              Image URL for the brand
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+
+        <ResponseField name="link" type="string">
+          Affiliate or tracking link for the brand
+        </ResponseField>
+
+        <ResponseField name="code" type="string">
+          Tracking code for impression registration
+        </ResponseField>
+
+        <ResponseField name="similarityScore" type="number">
+          Similarity score (0-1) indicating how well the message matched the brand's triggers
+        </ResponseField>
+
+        <ResponseField name="triggerPhrases" type="string[]">
+          List of trigger phrases configured for the matched brand
+        </ResponseField>
+
+        <ResponseField name="matchedTriggers" type="string[]">
+          List of trigger phrases that matched in the user's message
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Basic Usage with for await
+
+```typescript
+const stream = client.answerStreamGenerator({
+  message: 'What are the best noise-cancelling headphones?'
+});
+
+for await (const chunk of stream) {
+  if (typeof chunk === 'string') {
+    // Text chunk - accumulated text so far
+    console.log('Text:', chunk);
+  } else {
+    // Metadata object
+    console.log('Brand:', chunk.metadata.metadata.brandUsed?.name);
+    console.log('Link:', chunk.metadata.metadata.link);
+  }
+}
+```
+
+### Update DOM in Real-Time
+
+```typescript
+const responseElement = document.getElementById('response');
+const brandElement = document.getElementById('brand');
+
+const stream = client.answerStreamGenerator({
+  message: 'Best laptops for developers?'
+});
+
+for await (const chunk of stream) {
+  if (typeof chunk === 'string') {
+    // Update UI with accumulated text
+    responseElement.textContent = chunk;
+  } else {
+    // Display brand information
+    const brand = chunk.metadata.metadata.brandUsed;
+    if (brand) {
+      brandElement.innerHTML = `
+        <img src="${brand.image}" alt="${brand.name}">
+        <a href="${chunk.metadata.metadata.link}">${brand.name}</a>
+      `;
+    }
+  }
+}
+```
+
+### With Loading States
+
+```typescript
+const loadingElement = document.getElementById('loading');
+const responseElement = document.getElementById('response');
+
+loadingElement.style.display = 'block';
+
+try {
+  const stream = client.answerStreamGenerator({
+    message: 'Explain quantum computing',
+    model: 'gpt-4-turbo'
+  });
+
+  for await (const chunk of stream) {
+    if (typeof chunk === 'string') {
+      responseElement.textContent = chunk;
+    } else {
+      console.log('Streaming complete');
+    }
+  }
+} finally {
+  loadingElement.style.display = 'none';
+}
+```
+
+### Extract Text and Metadata Separately
+
+```typescript
+const stream = client.answerStreamGenerator({
+  message: 'Best running shoes for marathon training?'
+});
+
+let finalText = '';
+let metadata;
+
+for await (const chunk of stream) {
+  if (typeof chunk === 'string') {
+    finalText = chunk;
+    console.log(`Progress: ${chunk.length} characters`);
+  } else {
+    metadata = chunk.metadata;
+  }
+}
+
+console.log('Final text:', finalText);
+console.log('Metadata:', metadata);
+```
+
+### With Type Guards
+
+```typescript
+function isMetadata(chunk: string | { metadata: AnswerResponse }): chunk is { metadata: AnswerResponse } {
+  return typeof chunk !== 'string';
+}
+
+const stream = client.answerStreamGenerator({
+  message: 'What are the best cameras for photography?'
+});
+
+for await (const chunk of stream) {
+  if (isMetadata(chunk)) {
+    console.log('Received metadata:', chunk.metadata);
+  } else {
+    console.log('Received text:', chunk);
+  }
+}
+```
+
+### With Conversation Context
+
+```typescript
+const stream = client.answerStreamGenerator({
+  message: 'What about battery life?',
+  conversationId: 'conv_789',
+  previousMessages: [
+    {
+      role: 'user',
+      content: 'Best wireless headphones?'
+    },
+    {
+      role: 'assistant',
+      content: 'For wireless headphones, I recommend...'
+    }
+  ]
+});
+
+for await (const chunk of stream) {
+  if (typeof chunk === 'string') {
+    console.log(chunk);
+  }
+}
+```
+
+### Character Count Tracking
+
+```typescript
+let previousLength = 0;
+
+const stream = client.answerStreamGenerator({
+  message: 'Tell me about electric vehicles'
+});
+
+for await (const chunk of stream) {
+  if (typeof chunk === 'string') {
+    const newChars = chunk.length - previousLength;
+    console.log(`Received ${newChars} new characters`);
+    previousLength = chunk.length;
+  }
+}
+```
+
+### Early Termination
+
+```typescript
+const stream = client.answerStreamGenerator({
+  message: 'Write a long article about AI'
+});
+
+let characterCount = 0;
+const maxChars = 500;
+
+for await (const chunk of stream) {
+  if (typeof chunk === 'string') {
+    characterCount = chunk.length;
+    
+    // Stop streaming after reaching character limit
+    if (characterCount >= maxChars) {
+      console.log('Reached character limit, stopping...');
+      break;
+    }
+    
+    console.log(chunk);
+  }
+}
+```
+
+## Error Handling
+
+```typescript
+try {
+  const stream = client.answerStreamGenerator({
+    message: '  ' // Empty message
+  });
+
+  for await (const chunk of stream) {
+    console.log(chunk);
+  }
+} catch (error) {
+  console.error('Error:', error.message);
+  // Output: "Message is required"
+}
+```
+
+### Network and Timeout Errors
+
+```typescript
+import { NetworkError, TimeoutError } from '@thred/sdk';
+
+try {
+  const stream = client.answerStreamGenerator({
+    message: 'What are the best smartphones?'
+  });
+
+  for await (const chunk of stream) {
+    if (typeof chunk === 'string') {
+      console.log(chunk);
+    }
+  }
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    console.error('Request timed out');
+  } else if (error instanceof NetworkError) {
+    console.error('Network error:', error.message);
+  } else {
+    console.error('Streaming error:', error);
+  }
+}
+```
+
+## Streaming Format
+
+The generator yields values in this sequence:
+
+1. **Multiple string yields**: Each contains the accumulated text from the start
+2. **One metadata yield**: Final object with complete response and metadata
+
+```typescript
+// Yield 1: "Hello"
+// Yield 2: "Hello, I"
+// Yield 3: "Hello, I can"
+// Yield 4: "Hello, I can help"
+// ...
+// Final yield: { metadata: { response: "Hello, I can help...", metadata: {...} } }
+```
+
+## How It Works
+
+1. Validates the message is not empty
+2. Sends a POST request to `/v1/answer/stream`
+3. Processes the response stream using ReadableStream API
+4. Yields accumulated text strings as data arrives
+5. Parses metadata from the end of the stream
+6. Yields the final metadata object
+7. Generator completes
+
+## Use Cases
+
+### When to Use `answerStreamGenerator()`
+
+- You prefer modern async/await syntax over callbacks
+- You need fine-grained control over stream processing
+- You want to easily break out of the streaming loop
+- You're building with TypeScript and want strong type inference
+
+### When to Use `answerStream()` Instead
+
+- You prefer callback-based APIs
+- You need automatic DOM updates via `targets` parameter
+- You want automatic impression tracking
+- You need simpler code for basic streaming
+
+### When to Use `answer()` Instead
+
+- You don't need streaming
+- You want the complete response at once
+- You're building a non-interactive feature
+
+## Comparison with answerStream()
+
+| Feature | answerStreamGenerator() | answerStream() |
+|---------|------------------------|----------------|
+| Syntax | `for await...of` | Callback function |
+| DOM targets | Not supported | Supported |
+| Impression tracking | Manual | Automatic |
+| Control flow | Can break/continue | Must complete |
+| Type safety | Excellent | Good |
+| Complexity | More flexible | Simpler |
+
+## Related
+
+- [answerStream()](/api/answer-stream) - Stream with callback function
+- [answer()](/api/answer) - Non-streaming response
+- [Client Configuration](/api/client-configuration) - Configure timeouts and models

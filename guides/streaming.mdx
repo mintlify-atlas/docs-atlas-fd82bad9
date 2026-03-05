@@ -1,0 +1,420 @@
+---
+title: 'Streaming Responses'
+description: 'Learn how to implement real-time streaming responses for better user experience'
+---
+
+## Overview
+
+Thred SDK provides comprehensive streaming support for AI-generated responses, enabling real-time UI updates as content is generated. This creates a more engaging user experience, especially for longer responses.
+
+The SDK offers two streaming approaches:
+
+1. **Callback-based streaming** with `answerStream()` - Best for simple real-time updates
+2. **Async generator streaming** with `answerStreamGenerator()` - Best for fine-grained control
+
+<Info>
+Streaming is particularly useful for long-form content where waiting for the complete response would create a poor user experience.
+</Info>
+
+## Callback-Based Streaming
+
+The `answerStream()` method accepts a callback function that receives the accumulated text as it streams.
+
+### Method Signature
+
+```typescript
+async answerStream(
+  request: AnswerRequest,
+  onChunk: (accumulatedText: string) => void,
+  targets?: Targets
+): Promise<AnswerResponse | null>
+```
+
+### Basic Example
+
+```typescript
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+const metadata = await client.answerStream(
+  {
+    message: 'Explain agile project management in detail',
+    model: 'gpt-4',
+  },
+  (accumulatedText) => {
+    // This callback is called multiple times as text streams in
+    document.getElementById('response').textContent = accumulatedText;
+  }
+);
+
+// After streaming completes, you receive the full metadata
+console.log('Brand used:', metadata?.metadata.brandUsed?.name);
+```
+
+### Real-Time UI Updates
+
+```typescript
+const responseElement = document.getElementById('ai-response');
+const loadingIndicator = document.getElementById('loading');
+
+loadingIndicator.style.display = 'block';
+
+try {
+  const metadata = await client.answerStream(
+    {
+      message: 'What are the best productivity tools for remote teams?',
+      model: 'gpt-4-turbo',
+      instructions: 'Be comprehensive and include specific recommendations',
+    },
+    (text) => {
+      // Update UI with each chunk
+      responseElement.innerHTML = text;
+      // Auto-scroll to bottom
+      responseElement.scrollTop = responseElement.scrollHeight;
+    }
+  );
+
+  // Handle brand metadata after streaming completes
+  if (metadata?.metadata.brandUsed) {
+    displayBrandInfo(metadata.metadata);
+  }
+} catch (error) {
+  responseElement.innerHTML = 'Error generating response';
+} finally {
+  loadingIndicator.style.display = 'none';
+}
+```
+
+## Async Generator Streaming
+
+The `answerStreamGenerator()` method returns an async generator, providing more control over the streaming process.
+
+### Method Signature
+
+```typescript
+async *answerStreamGenerator(
+  request: AnswerRequest
+): AsyncGenerator<string | { metadata: AnswerResponse }, void, unknown>
+```
+
+### Basic Example
+
+```typescript
+for await (const chunk of client.answerStreamGenerator({
+  message: 'What are cloud storage options for businesses?',
+  model: 'gpt-4',
+})) {
+  if (typeof chunk === 'string') {
+    // This is accumulated text
+    console.log('Current text:', chunk);
+    updateUI(chunk);
+  } else {
+    // This is the final metadata object
+    console.log('Brand:', chunk.metadata.metadata.brandUsed?.name);
+    console.log('Similarity score:', chunk.metadata.metadata.similarityScore);
+  }
+}
+```
+
+### Advanced Example with State Management
+
+```typescript
+async function streamWithStateManagement() {
+  let fullText = '';
+  let chunkCount = 0;
+  const startTime = Date.now();
+
+  try {
+    for await (const chunk of client.answerStreamGenerator({
+      message: 'Compare enterprise CRM solutions',
+      model: 'gpt-4-turbo',
+      maxTokens: 1000,
+    })) {
+      if (typeof chunk === 'string') {
+        fullText = chunk;
+        chunkCount++;
+        
+        // Update UI
+        document.getElementById('response').innerHTML = fullText;
+        
+        // Update metrics
+        document.getElementById('chunk-count').textContent = `Chunks: ${chunkCount}`;
+        document.getElementById('char-count').textContent = `Characters: ${fullText.length}`;
+      } else {
+        // Streaming complete
+        const duration = Date.now() - startTime;
+        console.log(`Streaming completed in ${duration}ms`);
+        console.log(`Received ${chunkCount} chunks`);
+        
+        // Display brand information
+        if (chunk.metadata.metadata.brandUsed) {
+          displayBrandCard({
+            name: chunk.metadata.metadata.brandUsed.name,
+            link: chunk.metadata.metadata.link,
+            score: chunk.metadata.metadata.similarityScore,
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Streaming error:', error);
+  }
+}
+```
+
+## Streaming vs Non-Streaming
+
+<Tabs>
+  <Tab title="When to Use Streaming">
+    ### Use Streaming When:
+    
+    - **Long responses expected** - Queries that will generate 200+ words
+    - **User engagement is critical** - Interactive chat interfaces
+    - **Progressive rendering needed** - Display content as it arrives
+    - **Perceived performance matters** - Users see immediate feedback
+    
+    ```typescript
+    // Good use case for streaming
+    await client.answerStream(
+      {
+        message: 'Write a comprehensive guide to project management',
+        model: 'gpt-4',
+        maxTokens: 2000,
+      },
+      (text) => updateUI(text)
+    );
+    ```
+  </Tab>
+  
+  <Tab title="When to Use Non-Streaming">
+    ### Use Non-Streaming When:
+    
+    - **Short responses expected** - Quick answers or simple queries
+    - **Batch processing** - Processing multiple requests
+    - **Complete response needed** - Need full text before displaying
+    - **Simpler implementation** - Straightforward request/response pattern
+    
+    ```typescript
+    // Good use case for non-streaming
+    const response = await client.answer({
+      message: 'What is CRM?',
+      model: 'gpt-3.5-turbo',
+      maxTokens: 100,
+    });
+    
+    console.log(response.response);
+    ```
+  </Tab>
+</Tabs>
+
+## Use Cases
+
+### Chat Interface
+
+```typescript
+class ChatInterface {
+  private client: ThredClient;
+  private conversationId: string;
+
+  constructor(apiKey: string) {
+    this.client = new ThredClient({ apiKey });
+    this.conversationId = `chat_${Date.now()}`;
+  }
+
+  async sendMessage(message: string) {
+    const messageElement = this.createMessageElement();
+    
+    await this.client.answerStream(
+      {
+        message,
+        conversationId: this.conversationId,
+        model: 'gpt-4-turbo',
+      },
+      (text) => {
+        messageElement.innerHTML = this.formatMarkdown(text);
+      },
+      {
+        text: messageElement,
+      }
+    );
+  }
+
+  private createMessageElement(): HTMLElement {
+    const element = document.createElement('div');
+    element.className = 'message assistant';
+    document.getElementById('chat-container')?.appendChild(element);
+    return element;
+  }
+
+  private formatMarkdown(text: string): string {
+    // Format markdown to HTML
+    return text; // Add your markdown parser here
+  }
+}
+```
+
+### Progress Indicators
+
+```typescript
+async function streamWithProgress() {
+  const progressBar = document.getElementById('progress') as HTMLProgressElement;
+  const statusText = document.getElementById('status');
+  
+  let estimatedLength = 500; // Estimate based on maxTokens
+  
+  for await (const chunk of client.answerStreamGenerator({
+    message: 'Explain machine learning concepts',
+    model: 'gpt-4',
+    maxTokens: 500,
+  })) {
+    if (typeof chunk === 'string') {
+      // Update progress based on text length
+      const progress = Math.min((chunk.length / estimatedLength) * 100, 95);
+      progressBar.value = progress;
+      statusText.textContent = `Generating... ${Math.round(progress)}%`;
+      
+      document.getElementById('response').textContent = chunk;
+    } else {
+      // Complete
+      progressBar.value = 100;
+      statusText.textContent = 'Complete!';
+    }
+  }
+}
+```
+
+### Typewriter Effect
+
+```typescript
+async function typewriterEffect() {
+  const element = document.getElementById('response');
+  let previousLength = 0;
+  
+  await client.answerStream(
+    {
+      message: 'Tell me about productivity software',
+      model: 'gpt-4',
+    },
+    (text) => {
+      // Only animate new characters
+      const newChars = text.slice(previousLength);
+      
+      // Add new characters with animation
+      for (const char of newChars) {
+        const span = document.createElement('span');
+        span.textContent = char;
+        span.className = 'fade-in';
+        element?.appendChild(span);
+      }
+      
+      previousLength = text.length;
+    }
+  );
+}
+```
+
+## DOM Integration with Streaming
+
+You can combine streaming with automatic DOM updates:
+
+```typescript
+await client.answerStream(
+  {
+    message: 'Best accounting software for freelancers?',
+  },
+  (text) => {
+    // Manual update during streaming
+    console.log('Streaming:', text.length, 'characters');
+  },
+  {
+    text: 'response-container',  // Auto-updated on completion
+    link: 'affiliate-link',      // Auto-updated on completion
+  }
+);
+```
+
+<Warning>
+When using the `targets` parameter, the DOM elements are updated only after streaming completes, not during the stream. Use the callback for real-time updates.
+</Warning>
+
+## Error Handling
+
+```typescript
+import { TimeoutError, NetworkError } from '@thred-apps/thred-js';
+
+try {
+  await client.answerStream(
+    { message: 'Long query here' },
+    (text) => updateUI(text)
+  );
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    console.error('Stream timed out');
+    showError('Request took too long. Please try again.');
+  } else if (error instanceof NetworkError) {
+    console.error('Network error during streaming');
+    showError('Connection lost. Please check your internet.');
+  } else {
+    console.error('Streaming error:', error);
+    showError('An error occurred. Please try again.');
+  }
+}
+```
+
+## Performance Tips
+
+<Tip>
+**Optimize UI Updates**: Debounce or throttle rapid UI updates if streaming very fast to avoid performance issues.
+</Tip>
+
+```typescript
+let updateTimeout: NodeJS.Timeout;
+
+await client.answerStream(
+  { message: 'Query here' },
+  (text) => {
+    // Debounce UI updates to every 50ms
+    clearTimeout(updateTimeout);
+    updateTimeout = setTimeout(() => {
+      document.getElementById('response').textContent = text;
+    }, 50);
+  }
+);
+```
+
+## Best Practices
+
+1. **Choose the right streaming method**
+   - Use `answerStream()` for simple callbacks
+   - Use `answerStreamGenerator()` for complex control flow
+
+2. **Handle errors gracefully**
+   - Always wrap streaming in try-catch
+   - Provide user feedback on failures
+
+3. **Optimize performance**
+   - Debounce rapid UI updates
+   - Use `requestAnimationFrame` for smooth animations
+
+4. **Provide visual feedback**
+   - Show loading states
+   - Display progress indicators
+   - Enable users to see streaming in action
+
+5. **Clean up resources**
+   - Cancel streams when components unmount
+   - Clear timeouts and intervals
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Conversation Context" icon="comments" href="/guides/conversation-context">
+    Maintain context across multiple streaming requests
+  </Card>
+  <Card title="Error Handling" icon="shield-exclamation" href="/guides/error-handling">
+    Handle streaming errors effectively
+  </Card>
+</CardGroup>

@@ -1,0 +1,151 @@
+---
+title: Installation
+description: Install the Thred SDK and configure your development environment
+---
+
+## Requirements
+
+Before installing Thred SDK, ensure your environment meets these requirements:
+
+### Node.js
+
+- **Node.js 16.0.0 or higher** is required
+- For Node.js versions below 18, you'll need a fetch polyfill (see below)
+
+### Browser Support
+
+Thred SDK uses modern JavaScript features and requires:
+
+- **Chrome** 80+
+- **Firefox** 75+
+- **Safari** 13.1+
+- **Edge** 80+
+
+The SDK requires the following browser APIs:
+- ES2020+
+- Fetch API
+- ReadableStream
+- TextDecoder
+- AbortController
+
+## Install the Package
+
+Install the Thred SDK using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install @thred-apps/thred-js
+```
+
+```bash yarn
+yarn add @thred-apps/thred-js
+```
+
+```bash pnpm
+pnpm add @thred-apps/thred-js
+```
+</CodeGroup>
+
+## Get Your API Key
+
+To use Thred SDK, you'll need an API key:
+
+1. Visit [https://thred.ai](https://thred.ai) and create an account
+2. Navigate to your dashboard
+3. Generate a new API key
+4. Copy your API key (it should start with `sk_`)
+
+<Warning>
+  Keep your API key secure! Never commit it to version control or expose it in client-side code.
+</Warning>
+
+## Environment Setup
+
+### Using Environment Variables (Recommended)
+
+Store your API key in an environment variable for security:
+
+<CodeGroup>
+```bash .env
+THRED_API_KEY=sk_your_api_key_here
+```
+
+```typescript TypeScript
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+```
+</CodeGroup>
+
+### Node.js < 18 Setup
+
+If you're using Node.js version 17 or below, you'll need to install and configure a fetch polyfill:
+
+<CodeGroup>
+```bash Install
+npm install node-fetch
+```
+
+```typescript Usage
+import fetch from 'node-fetch';
+global.fetch = fetch as any;
+
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+```
+</CodeGroup>
+
+<Tip>
+  Node.js 18+ includes a native fetch implementation, so no polyfill is needed.
+</Tip>
+
+## Verify Installation
+
+Create a simple test file to verify your installation:
+
+```typescript test.ts
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+console.log('Thred SDK initialized successfully!');
+```
+
+Run it:
+
+```bash
+node test.ts
+```
+
+If you see "Thred SDK initialized successfully!" without errors, you're ready to go!
+
+## TypeScript Configuration
+
+Thred SDK is written in TypeScript and includes full type definitions. No additional setup is required, but ensure your `tsconfig.json` includes:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM"],
+    "moduleResolution": "node",
+    "esModuleInterop": true
+  }
+}
+```
+
+## Next Steps
+
+Now that you have Thred SDK installed, let's generate your first AI response!
+
+<Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+  Generate your first AI-powered response with brand enrichment in under 5 minutes
+</Card>

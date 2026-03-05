@@ -1,0 +1,662 @@
+---
+title: 'Error Handling'
+description: 'Comprehensive error handling strategies for robust production applications'
+---
+
+## Overview
+
+The Thred SDK provides a robust error handling system with specific error classes for different failure scenarios. Proper error handling ensures your application gracefully handles issues and provides meaningful feedback to users.
+
+## Error Classes
+
+All Thred errors extend the base `ThredError` class and include detailed error information.
+
+### Error Class Hierarchy
+
+```typescript
+ThredError (base class)
+├── AuthenticationError (401)
+├── ValidationError (400)
+├── ServerError (500)
+├── NetworkError (network failures)
+└── TimeoutError (request timeouts)
+```
+
+### ThredError (Base Class)
+
+The base error class that all other errors extend:
+
+```typescript
+class ThredError extends Error {
+  statusCode?: number;       // HTTP status code
+  response?: ErrorResponse;  // API error response
+}
+
+type ErrorResponse = {
+  error: string;      // Error type or category
+  message?: string;   // Detailed error message
+};
+```
+
+### AuthenticationError
+
+Thrown when API authentication fails (HTTP 401).
+
+**Common Causes:**
+- Invalid API key
+- Expired API key
+- Missing Authorization header
+
+```typescript
+import { AuthenticationError } from '@thred-apps/thred-js';
+
+try {
+  const response = await client.answer({ message: 'test' });
+} catch (error) {
+  if (error instanceof AuthenticationError) {
+    console.error('Authentication failed');
+    console.error('Status:', error.statusCode); // 401
+    console.error('Message:', error.message);
+    
+    // Handle: Prompt user to check API key configuration
+    showError('Invalid API key. Please check your configuration.');
+  }
+}
+```
+
+### ValidationError
+
+Thrown when request validation fails (HTTP 400).
+
+**Common Causes:**
+- Empty message
+- Invalid model name
+- Invalid parameters
+- Missing required fields
+
+```typescript
+import { ValidationError } from '@thred-apps/thred-js';
+
+try {
+  const response = await client.answer({
+    message: '', // Invalid: empty message
+  });
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.error('Validation error');
+    console.error('Details:', error.response);
+    
+    // Handle: Show validation error to user
+    showError(`Invalid request: ${error.message}`);
+  }
+}
+```
+
+### ServerError
+
+Thrown when the API returns a server error (HTTP 500).
+
+**Common Causes:**
+- API internal error
+- Service temporarily unavailable
+- Unexpected server condition
+
+```typescript
+import { ServerError } from '@thred-apps/thred-js';
+
+try {
+  const response = await client.answer({ message: 'test' });
+} catch (error) {
+  if (error instanceof ServerError) {
+    console.error('Server error occurred');
+    
+    // Handle: Retry with exponential backoff
+    await retryWithBackoff(() => client.answer({ message: 'test' }));
+  }
+}
+```
+
+### NetworkError
+
+Thrown when a network request fails.
+
+**Common Causes:**
+- No internet connection
+- DNS resolution failure
+- Connection refused
+- Network timeout
+
+```typescript
+import { NetworkError } from '@thred-apps/thred-js';
+
+try {
+  const response = await client.answer({ message: 'test' });
+} catch (error) {
+  if (error instanceof NetworkError) {
+    console.error('Network error:', error.message);
+    
+    // Handle: Check connectivity and retry
+    showError('Connection failed. Please check your internet connection.');
+  }
+}
+```
+
+### TimeoutError
+
+Thrown when a request exceeds the configured timeout.
+
+**Common Causes:**
+- Request took longer than configured timeout
+- Slow network connection
+- Large response generation
+
+```typescript
+import { TimeoutError } from '@thred-apps/thred-js';
+
+try {
+  const response = await client.answer({ message: 'very complex query' });
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    console.error('Request timed out:', error.message);
+    
+    // Handle: Suggest streaming or increase timeout
+    showError('Request took too long. Try streaming for better performance.');
+  }
+}
+```
+
+## Error Handling Patterns
+
+### Basic Try-Catch
+
+```typescript
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+try {
+  const response = await client.answer({
+    message: 'What are the best productivity tools?',
+  });
+  
+  console.log(response.response);
+} catch (error) {
+  console.error('Error occurred:', error);
+  // Basic error handling
+}
+```
+
+### Specific Error Handling
+
+```typescript
+import {
+  ThredClient,
+  ThredError,
+  AuthenticationError,
+  ValidationError,
+  ServerError,
+  NetworkError,
+  TimeoutError,
+} from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+try {
+  const response = await client.answer({
+    message: 'What are the best tools?',
+  });
+  
+  displayResponse(response.response);
+} catch (error) {
+  if (error instanceof AuthenticationError) {
+    // Handle authentication errors
+    console.error('Invalid API key');
+    redirectToSettings();
+  } else if (error instanceof ValidationError) {
+    // Handle validation errors
+    console.error('Invalid request:', error.message);
+    showValidationError(error.message);
+  } else if (error instanceof TimeoutError) {
+    // Handle timeout errors
+    console.error('Request took too long');
+    suggestStreaming();
+  } else if (error instanceof NetworkError) {
+    // Handle network errors
+    console.error('Network connection failed');
+    showOfflineMessage();
+  } else if (error instanceof ServerError) {
+    // Handle server errors
+    console.error('Server error:', error.message);
+    scheduleRetry();
+  } else if (error instanceof ThredError) {
+    // Handle other Thred errors
+    console.error(`API error (${error.statusCode}):`, error.message);
+    showGenericError();
+  } else {
+    // Handle unexpected errors
+    console.error('Unexpected error:', error);
+    reportToMonitoring(error);
+  }
+}
+```
+
+### Async/Await with Error Recovery
+
+```typescript
+async function getAIResponse(message: string): Promise<string> {
+  try {
+    const response = await client.answer({ message });
+    return response.response;
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      // Retry with streaming on timeout
+      console.log('Switching to streaming due to timeout');
+      return await getStreamingResponse(message);
+    } else if (error instanceof NetworkError) {
+      // Return cached response if available
+      const cached = getCachedResponse(message);
+      if (cached) return cached;
+      throw error;
+    } else {
+      throw error;
+    }
+  }
+}
+
+async function getStreamingResponse(message: string): Promise<string> {
+  let fullResponse = '';
+  
+  await client.answerStream(
+    { message },
+    (text) => { fullResponse = text; }
+  );
+  
+  return fullResponse;
+}
+```
+
+## Production Error Handling
+
+### Complete Production Example
+
+```typescript
+import {
+  ThredClient,
+  AuthenticationError,
+  ValidationError,
+  ServerError,
+  NetworkError,
+  TimeoutError,
+} from '@thred-apps/thred-js';
+
+class ProductionThredService {
+  private client: ThredClient;
+  private maxRetries = 3;
+  private retryDelay = 1000;
+
+  constructor(apiKey: string) {
+    this.client = new ThredClient({
+      apiKey,
+      timeout: 30000,
+      defaultModel: 'gpt-4',
+    });
+  }
+
+  async getResponse(message: string): Promise<{
+    success: boolean;
+    data?: string;
+    error?: string;
+  }> {
+    try {
+      const response = await this.executeWithRetry(
+        () => this.client.answer({ message })
+      );
+      
+      return {
+        success: true,
+        data: response.response,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.formatError(error),
+      };
+    }
+  }
+
+  private async executeWithRetry<T>(
+    fn: () => Promise<T>,
+    attempt = 1
+  ): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      // Don't retry auth or validation errors
+      if (
+        error instanceof AuthenticationError ||
+        error instanceof ValidationError
+      ) {
+        throw error;
+      }
+
+      // Retry on server, network, or timeout errors
+      if (
+        attempt < this.maxRetries &&
+        (error instanceof ServerError ||
+         error instanceof NetworkError ||
+         error instanceof TimeoutError)
+      ) {
+        console.log(`Retry attempt ${attempt + 1}/${this.maxRetries}`);
+        
+        // Exponential backoff
+        const delay = this.retryDelay * Math.pow(2, attempt - 1);
+        await this.sleep(delay);
+        
+        return this.executeWithRetry(fn, attempt + 1);
+      }
+
+      throw error;
+    }
+  }
+
+  private formatError(error: unknown): string {
+    if (error instanceof AuthenticationError) {
+      return 'Authentication failed. Please check your API key.';
+    } else if (error instanceof ValidationError) {
+      return `Invalid request: ${error.message}`;
+    } else if (error instanceof TimeoutError) {
+      return 'Request timed out. Please try again or use streaming.';
+    } else if (error instanceof NetworkError) {
+      return 'Network error. Please check your connection.';
+    } else if (error instanceof ServerError) {
+      return 'Server error. Please try again later.';
+    } else if (error instanceof Error) {
+      return error.message;
+    } else {
+      return 'An unexpected error occurred.';
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// Usage
+const service = new ProductionThredService(process.env.THRED_API_KEY!);
+
+const result = await service.getResponse('What are the best CRM tools?');
+
+if (result.success) {
+  console.log('Response:', result.data);
+} else {
+  console.error('Error:', result.error);
+}
+```
+
+### Error Logging and Monitoring
+
+```typescript
+import * as Sentry from '@sentry/node';
+
+class MonitoredThredClient {
+  private client: ThredClient;
+
+  constructor(apiKey: string) {
+    this.client = new ThredClient({ apiKey });
+  }
+
+  async answer(message: string) {
+    try {
+      return await this.client.answer({ message });
+    } catch (error) {
+      // Log to monitoring service
+      this.logError(error, { message });
+      throw error;
+    }
+  }
+
+  private logError(error: unknown, context: Record<string, any>) {
+    if (error instanceof AuthenticationError) {
+      // Critical: Authentication issues
+      Sentry.captureException(error, {
+        level: 'error',
+        tags: { errorType: 'authentication' },
+        extra: context,
+      });
+    } else if (error instanceof ValidationError) {
+      // Warning: User input issues
+      Sentry.captureException(error, {
+        level: 'warning',
+        tags: { errorType: 'validation' },
+        extra: context,
+      });
+    } else if (error instanceof TimeoutError) {
+      // Info: Performance issues
+      Sentry.captureException(error, {
+        level: 'info',
+        tags: { errorType: 'timeout' },
+        extra: context,
+      });
+    } else if (error instanceof NetworkError) {
+      // Warning: Connectivity issues
+      Sentry.captureException(error, {
+        level: 'warning',
+        tags: { errorType: 'network' },
+        extra: context,
+      });
+    } else if (error instanceof ServerError) {
+      // Error: Server-side issues
+      Sentry.captureException(error, {
+        level: 'error',
+        tags: { errorType: 'server' },
+        extra: context,
+      });
+    } else {
+      // Unknown errors
+      Sentry.captureException(error, {
+        level: 'error',
+        tags: { errorType: 'unknown' },
+        extra: context,
+      });
+    }
+  }
+}
+```
+
+## Streaming Error Handling
+
+Error handling for streaming methods:
+
+```typescript
+// answerStream() error handling
+try {
+  await client.answerStream(
+    { message: 'Long query here' },
+    (text) => {
+      try {
+        updateUI(text);
+      } catch (uiError) {
+        console.error('UI update error:', uiError);
+        // Don't throw - let streaming continue
+      }
+    }
+  );
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    showError('Streaming timed out');
+  } else if (error instanceof NetworkError) {
+    showError('Connection lost during streaming');
+  } else {
+    showError('Streaming failed');
+  }
+}
+
+// answerStreamGenerator() error handling
+try {
+  for await (const chunk of client.answerStreamGenerator({ message: 'test' })) {
+    try {
+      if (typeof chunk === 'string') {
+        updateUI(chunk);
+      } else {
+        handleMetadata(chunk.metadata);
+      }
+    } catch (processingError) {
+      console.error('Chunk processing error:', processingError);
+      // Continue streaming despite processing errors
+    }
+  }
+} catch (error) {
+  handleStreamingError(error);
+}
+```
+
+## Client-Side Validation
+
+Prevent errors by validating input before sending:
+
+```typescript
+function validateMessage(message: string): { valid: boolean; error?: string } {
+  if (!message || message.trim().length === 0) {
+    return { valid: false, error: 'Message cannot be empty' };
+  }
+  
+  if (message.length > 4000) {
+    return { valid: false, error: 'Message is too long (max 4000 characters)' };
+  }
+  
+  return { valid: true };
+}
+
+async function safeAnswer(message: string) {
+  const validation = validateMessage(message);
+  
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+  
+  return await client.answer({ message });
+}
+```
+
+## Best Practices
+
+<Tip>
+**Always handle errors specifically**: Don't just catch and log all errors the same way. Different errors require different handling strategies.
+</Tip>
+
+1. **Use specific error types**
+   ```typescript
+   // Good
+   if (error instanceof AuthenticationError) {
+     redirectToLogin();
+   }
+   
+   // Bad
+   if (error.statusCode === 401) {
+     redirectToLogin();
+   }
+   ```
+
+2. **Implement retry logic for transient failures**
+   ```typescript
+   // Retry on ServerError, NetworkError, TimeoutError
+   // Don't retry on AuthenticationError or ValidationError
+   ```
+
+3. **Provide user-friendly error messages**
+   ```typescript
+   // Good
+   showError('Connection lost. Please check your internet.');
+   
+   // Bad
+   showError(error.toString());
+   ```
+
+4. **Log errors for debugging**
+   ```typescript
+   console.error('Error details:', {
+     type: error.constructor.name,
+     message: error.message,
+     statusCode: error instanceof ThredError ? error.statusCode : undefined,
+     timestamp: new Date().toISOString(),
+   });
+   ```
+
+5. **Use timeout configuration wisely**
+   ```typescript
+   // Adjust timeout based on expected response time
+   const client = new ThredClient({
+     apiKey: process.env.THRED_API_KEY!,
+     timeout: 60000, // 60s for complex queries
+   });
+   ```
+
+6. **Implement graceful degradation**
+   ```typescript
+   try {
+     return await getAIResponse();
+   } catch (error) {
+     return getCachedResponse() || getDefaultResponse();
+   }
+   ```
+
+## Common Pitfalls
+
+<Warning>
+**Avoid these common mistakes:**
+
+- Not catching errors at all (causes unhandled promise rejections)
+- Catching all errors the same way (different errors need different handling)
+- Not implementing retry logic for transient failures
+- Exposing raw error messages to users (security risk)
+- Not logging errors for debugging (makes troubleshooting difficult)
+</Warning>
+
+## Error Response Structure
+
+The API returns error responses in this format:
+
+```typescript
+type ErrorResponse = {
+  error: string;      // Error category/type
+  message?: string;   // Detailed error message
+};
+```
+
+Example error responses:
+
+```json
+// Authentication Error
+{
+  "error": "unauthorized",
+  "message": "Invalid API key"
+}
+
+// Validation Error
+{
+  "error": "validation_error",
+  "message": "Message is required"
+}
+
+// Server Error
+{
+  "error": "internal_server_error",
+  "message": "An unexpected error occurred"
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Best Practices" icon="star" href="/guides/best-practices">
+    Learn comprehensive best practices for production use
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/errors/overview">
+    Explore detailed error API documentation
+  </Card>
+</CardGroup>

@@ -1,0 +1,132 @@
+---
+title: "Error Handling"
+description: "Learn how to handle errors in the Thred SDK"
+---
+
+The Thred SDK provides a comprehensive error handling system with specific error classes for different failure scenarios. All errors extend from the base `ThredError` class, making it easy to catch and handle errors appropriately.
+
+## Error Class Hierarchy
+
+All Thred SDK errors extend from the base `ThredError` class:
+
+```typescript
+ThredError (base class)
+├── AuthenticationError (401)
+├── ValidationError (400)
+├── ServerError (500)
+├── NetworkError
+└── TimeoutError
+```
+
+## How Errors Are Thrown
+
+The SDK automatically throws specific error types based on the API response status code and failure scenarios:
+
+- **401 Unauthorized** → `AuthenticationError`
+- **400 Bad Request** → `ValidationError`
+- **500 Internal Server Error** → `ServerError`
+- **Network failures** → `NetworkError`
+- **Request timeouts** → `TimeoutError`
+- **Other HTTP errors** → `ThredError` (with status code)
+
+## Basic Error Handling Pattern
+
+All error classes can be imported from the Thred SDK:
+
+```typescript
+import {
+  ThredClient,
+  ThredError,
+  AuthenticationError,
+  ValidationError,
+  ServerError,
+  NetworkError,
+  TimeoutError,
+} from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+try {
+  const response = await client.answer({
+    message: 'What are the best tools?',
+  });
+  console.log(response.response);
+} catch (error) {
+  if (error instanceof AuthenticationError) {
+    console.error('Invalid API key');
+  } else if (error instanceof ValidationError) {
+    console.error('Invalid request:', error.message);
+  } else if (error instanceof TimeoutError) {
+    console.error('Request took too long');
+  } else if (error instanceof NetworkError) {
+    console.error('Network connection failed');
+  } else if (error instanceof ServerError) {
+    console.error('Server error:', error.message);
+  } else if (error instanceof ThredError) {
+    console.error(`API error (${error.statusCode}):`, error.message);
+  }
+}
+```
+
+## Error Properties
+
+All error classes include the following properties:
+
+<ResponseField name="message" type="string" required>
+  The error message describing what went wrong
+</ResponseField>
+
+<ResponseField name="statusCode" type="number">
+  The HTTP status code associated with the error (if applicable)
+</ResponseField>
+
+<ResponseField name="response" type="ErrorResponse">
+  The error response from the API containing additional details
+  
+  <Expandable title="ErrorResponse">
+    <ResponseField name="error" type="string">
+      Error type or category
+    </ResponseField>
+    
+    <ResponseField name="message" type="string">
+      Detailed error message from the API
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Handling Streaming Errors
+
+Errors can also occur during streaming operations:
+
+```typescript
+try {
+  const metadata = await client.answerStream(
+    {
+      message: 'What are the best productivity tools?',
+      model: 'gpt-4',
+    },
+    (accumulatedText) => {
+      // Update UI with streaming text
+      document.getElementById('response').textContent = accumulatedText;
+    }
+  );
+  
+  console.log('Stream completed:', metadata);
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    console.error('Stream timed out');
+  } else if (error instanceof NetworkError) {
+    console.error('Network connection lost during streaming');
+  } else if (error instanceof ThredError) {
+    console.error('Streaming error:', error.message);
+  }
+}
+```
+
+## Next Steps
+
+<Card title="Error Types Reference" icon="list" href="/api/errors/error-types">
+  View detailed documentation for all error types and their properties
+</Card>

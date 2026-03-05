@@ -1,0 +1,287 @@
+---
+title: "Targets"
+description: "Target elements for automatic DOM integration of responses"
+---
+
+## Type Definition
+
+```typescript
+type Targets = {
+  text?: string | HTMLElement;
+  link?: string | HTMLElement;
+};
+```
+
+## Overview
+
+`Targets` allows you to specify DOM elements where the SDK should automatically insert the generated response text and brand link. This enables seamless integration without manual DOM manipulation.
+
+## Properties
+
+<ParamField path="text" type="string | HTMLElement">
+  Target element for the AI-generated response text. Can be:
+  - **CSS selector** (string): e.g., `"#response"`, `".ai-text"`, `"[data-ai-response]"`
+  - **HTMLElement**: Direct DOM element reference
+  
+  The response text will be automatically inserted into this element's `textContent` or `innerHTML`.
+</ParamField>
+
+<ParamField path="link" type="string | HTMLElement">
+  Target element for the brand affiliate link. Can be:
+  - **CSS selector** (string): e.g., `"#brand-link"`, `".brand-url"`
+  - **HTMLElement**: Direct DOM element reference (typically an `<a>` tag)
+  
+  The brand link will be automatically set as the element's `href` attribute if it's an anchor tag, or inserted as text content for other elements.
+</ParamField>
+
+## Examples
+
+### Using CSS Selectors
+
+```typescript
+const response = await thred.answer(
+  {
+    message: "What are the best wireless earbuds?"
+  },
+  {
+    text: "#ai-response",
+    link: "#brand-link"
+  }
+);
+
+// Response text is automatically inserted into <div id="ai-response"></div>
+// Brand link is automatically set on <a id="brand-link"></a>
+```
+
+```html
+<!-- Before API call -->
+<div id="ai-response"></div>
+<a id="brand-link" href="#">Learn More</a>
+
+<!-- After API call -->
+<div id="ai-response">
+  For wireless earbuds, I recommend the Sony WF-1000XM5...
+</div>
+<a id="brand-link" href="https://sony.com?ref=thred-xyz">Learn More</a>
+```
+
+### Using Direct Element References
+
+```typescript
+const textElement = document.getElementById("response-container");
+const linkElement = document.querySelector(".brand-cta");
+
+const response = await thred.answer(
+  {
+    message: "Tell me about mechanical keyboards"
+  },
+  {
+    text: textElement,
+    link: linkElement
+  }
+);
+```
+
+### Text Target Only
+
+```typescript
+// Only populate the text, ignore the link
+const response = await thred.answer(
+  {
+    message: "Explain quantum computing"
+  },
+  {
+    text: ".ai-content"
+  }
+);
+```
+
+### Link Target Only
+
+```typescript
+// Only populate the link, handle text manually
+const response = await thred.answer(
+  {
+    message: "Best running shoes for marathons"
+  },
+  {
+    link: "a.brand-affiliate-link"
+  }
+);
+
+// Handle text manually
+console.log(response.response);
+```
+
+## DOM Integration Patterns
+
+### Chat Interface
+
+```typescript
+const handleUserMessage = async (message: string) => {
+  // Create response container
+  const responseDiv = document.createElement("div");
+  responseDiv.className = "message ai-message";
+  responseDiv.innerHTML = `
+    <div class="message-text" data-ai-text></div>
+    <a class="brand-link" data-brand-link href="#" style="display:none">
+      View Product
+    </a>
+  `;
+  
+  chatContainer.appendChild(responseDiv);
+  
+  // Use targets to auto-populate
+  const result = await thred.answer(
+    { message },
+    {
+      text: responseDiv.querySelector("[data-ai-text]"),
+      link: responseDiv.querySelector("[data-brand-link]")
+    }
+  );
+  
+  // Show link if brand was matched
+  if (result.metadata.brandUsed) {
+    responseDiv.querySelector("[data-brand-link]").style.display = "inline";
+  }
+};
+```
+
+### Dynamic Content Cards
+
+```typescript
+const createResponseCard = async (query: string) => {
+  const card = document.createElement("div");
+  card.className = "response-card";
+  card.innerHTML = `
+    <div class="card-body">
+      <p class="response-text"></p>
+    </div>
+    <div class="card-footer">
+      <a class="btn-primary" href="#">Visit Brand</a>
+    </div>
+  `;
+  
+  document.getElementById("cards-container").appendChild(card);
+  
+  await thred.answer(
+    { message: query },
+    {
+      text: card.querySelector(".response-text"),
+      link: card.querySelector(".btn-primary")
+    }
+  );
+};
+
+await createResponseCard("Best coffee makers under $100");
+```
+
+### Form Integration
+
+```typescript
+document.getElementById("ask-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  
+  const input = e.target.querySelector("input[name='question']");
+  const resultContainer = document.getElementById("result");
+  const brandLinkElement = document.getElementById("affiliate-link");
+  
+  // Clear previous results
+  resultContainer.textContent = "Loading...";
+  brandLinkElement.style.display = "none";
+  
+  const response = await thred.answer(
+    { message: input.value },
+    {
+      text: resultContainer,
+      link: brandLinkElement
+    }
+  );
+  
+  // Show brand link if available
+  if (response.metadata.link) {
+    brandLinkElement.style.display = "block";
+    brandLinkElement.textContent = `Shop at ${response.metadata.brandUsed.name}`;
+  }
+});
+```
+
+### Multiple Targets Pattern
+
+```typescript
+const displayResponse = async (message: string, targetId: string) => {
+  const container = document.getElementById(targetId);
+  
+  const response = await thred.answer(
+    { message },
+    {
+      text: container.querySelector(".text"),
+      link: container.querySelector(".link")
+    }
+  );
+  
+  return response;
+};
+
+// Multiple parallel responses
+await Promise.all([
+  displayResponse("Best laptops for coding", "widget-1"),
+  displayResponse("Top gaming monitors", "widget-2"),
+  displayResponse("Ergonomic office chairs", "widget-3")
+]);
+```
+
+## Advanced Usage
+
+### Custom Element Handling
+
+```typescript
+class AIResponseElement extends HTMLElement {
+  async ask(question: string) {
+    const textEl = this.querySelector(".ai-text");
+    const linkEl = this.querySelector(".ai-link");
+    
+    const response = await thred.answer(
+      { message: question },
+      { text: textEl, link: linkEl }
+    );
+    
+    // Add custom attributes
+    if (response.metadata.brandUsed) {
+      this.setAttribute("data-brand", response.metadata.brandUsed.name);
+      this.setAttribute("data-similarity", response.metadata.similarityScore.toString());
+    }
+    
+    return response;
+  }
+}
+
+customElements.define("ai-response", AIResponseElement);
+```
+
+### Progressive Enhancement
+
+```typescript
+const enhanceExistingContent = async () => {
+  const sections = document.querySelectorAll("[data-ai-enhance]");
+  
+  for (const section of sections) {
+    const prompt = section.getAttribute("data-prompt");
+    
+    await thred.answer(
+      { message: prompt },
+      {
+        text: section.querySelector(".content"),
+        link: section.querySelector(".cta-link")
+      }
+    );
+  }
+};
+
+await enhanceExistingContent();
+```
+
+## Related Types
+
+- [AnswerRequest](/api/types/answer-request) - Used alongside targets in the answer() method
+- [AnswerResponse](/api/types/answer-response) - Response structure with text and link data

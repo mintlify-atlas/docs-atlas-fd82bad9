@@ -1,0 +1,594 @@
+---
+title: 'DOM Integration'
+description: 'Automatically update DOM elements with AI responses and brand information'
+---
+
+## Overview
+
+Thred SDK provides seamless DOM integration, allowing you to automatically update HTML elements with AI-generated responses and brand information. This eliminates boilerplate code and makes it easy to integrate AI responses into your web applications.
+
+## The Targets Type
+
+The `Targets` type defines which DOM elements should be automatically updated with response data:
+
+```typescript
+type Targets = {
+  text?: string | HTMLElement;   // Target for AI response text
+  link?: string | HTMLElement;   // Target for brand affiliate link
+};
+```
+
+You can specify targets in two ways:
+- **Element ID** (string) - The SDK will find the element using `document.getElementById()`
+- **HTMLElement** - Direct reference to the DOM element
+
+<Info>
+The `targets` parameter is optional for both `answer()` and `answerStream()` methods.
+</Info>
+
+## Basic Usage
+
+### Using Element IDs
+
+```typescript
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+// HTML:
+// <div id="ai-response"></div>
+// <a id="brand-link" href="#"></a>
+
+await client.answer(
+  {
+    message: 'What are the best CRM tools for small businesses?',
+  },
+  {
+    text: 'ai-response',    // Element ID
+    link: 'brand-link',     // Element ID
+  }
+);
+
+// The SDK automatically populates:
+// - #ai-response with the AI-generated text
+// - #brand-link with the affiliate link (if brand was matched)
+```
+
+### Using HTMLElement References
+
+```typescript
+const responseElement = document.getElementById('response-container');
+const linkElement = document.querySelector('.brand-link') as HTMLElement;
+
+await client.answer(
+  {
+    message: 'Recommend a project management tool',
+  },
+  {
+    text: responseElement,
+    link: linkElement,
+  }
+);
+```
+
+## The setResponse() Method
+
+The SDK uses the `setResponse()` method internally to update DOM elements. You can also call it manually for custom scenarios.
+
+### Method Signature
+
+```typescript
+async setResponse(
+  text: string,
+  code: string,
+  link?: string,
+  targets?: Targets
+): Promise<void>
+```
+
+### How It Works
+
+From `client.ts:268-318`, here's what `setResponse()` does:
+
+1. **Updates text target** - Sets `innerHTML` of the text element
+2. **Updates link target** - Sets `innerHTML` of the link element
+3. **Registers impression** - Sends tracking data to API for analytics
+
+```typescript
+// Simplified implementation from source
+async setResponse(
+  text: string,
+  code: string,
+  link?: string,
+  targets?: Targets
+) {
+  if (targets) {
+    if (targets.text) {
+      var textElement: HTMLElement | null = null;
+
+      if (targets?.text instanceof HTMLElement) {
+        textElement = targets.text;
+      } else {
+        textElement = document.getElementById(targets.text || "");
+      }
+      if (textElement) {
+        textElement.innerHTML = text;
+      }
+    }
+    if (targets.link) {
+      var linkElement: HTMLElement | null = null;
+
+      if (targets?.link instanceof HTMLElement) {
+        linkElement = targets.link;
+      } else {
+        linkElement = document.getElementById(targets.link || "");
+      }
+      if (linkElement && link) {
+        linkElement.innerHTML = link;
+      }
+    }
+  }
+
+  if (text && code) {
+    // Register impression for tracking
+    const url = `${this.baseUrl}/impressions/register`;
+    const response = await this.fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ text, code }),
+      },
+      this.timeout
+    );
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+    return response.json();
+  }
+}
+```
+
+### Manual Usage
+
+```typescript
+// Get response first
+const response = await client.answer({
+  message: 'Best email marketing software?',
+});
+
+// Manually update DOM with custom logic
+if (response.metadata.brandUsed) {
+  await client.setResponse(
+    response.response,
+    response.metadata.code!,
+    response.metadata.link,
+    {
+      text: 'custom-container',
+      link: 'custom-link',
+    }
+  );
+}
+```
+
+## Integration Patterns
+
+### Simple Integration
+
+Minimal code for basic use cases:
+
+```typescript
+// HTML
+<div id="question-input">
+  <input type="text" id="user-question" />
+  <button onclick="askQuestion()">Ask</button>
+</div>
+<div id="ai-answer"></div>
+<div id="brand-info"></div>
+
+// JavaScript
+const client = new ThredClient({ apiKey: 'your-key' });
+
+async function askQuestion() {
+  const question = document.getElementById('user-question').value;
+  
+  await client.answer(
+    { message: question },
+    {
+      text: 'ai-answer',
+      link: 'brand-info',
+    }
+  );
+}
+```
+
+### Chat Interface Pattern
+
+```typescript
+class ChatWidget {
+  private client: ThredClient;
+  private container: HTMLElement;
+
+  constructor(apiKey: string, containerId: string) {
+    this.client = new ThredClient({ apiKey });
+    this.container = document.getElementById(containerId)!;
+  }
+
+  async sendMessage(message: string) {
+    // Create message elements
+    const messageDiv = this.createMessageElement();
+    const linkDiv = this.createLinkElement();
+
+    this.container.appendChild(messageDiv);
+
+    // Auto-populate using targets
+    await this.client.answer(
+      { message, model: 'gpt-4-turbo' },
+      {
+        text: messageDiv,
+        link: linkDiv,
+      }
+    );
+
+    // Add link only if it was populated
+    if (linkDiv.innerHTML) {
+      this.container.appendChild(linkDiv);
+    }
+  }
+
+  private createMessageElement(): HTMLElement {
+    const div = document.createElement('div');
+    div.className = 'chat-message assistant';
+    return div;
+  }
+
+  private createLinkElement(): HTMLElement {
+    const div = document.createElement('div');
+    div.className = 'brand-recommendation';
+    return div;
+  }
+}
+
+// Usage
+const chat = new ChatWidget('your-api-key', 'chat-container');
+await chat.sendMessage('What CRM should I use?');
+```
+
+### Streaming with DOM Integration
+
+```typescript
+const responseContainer = document.getElementById('response');
+const linkContainer = document.getElementById('brand-link');
+
+await client.answerStream(
+  {
+    message: 'Explain project management methodologies',
+    model: 'gpt-4',
+  },
+  (accumulatedText) => {
+    // Update text in real-time during streaming
+    responseContainer.innerHTML = accumulatedText;
+  },
+  {
+    text: responseContainer,  // Also updated on completion
+    link: linkContainer,      // Updated on completion
+  }
+);
+```
+
+<Warning>
+**Important**: With streaming, the `targets.text` element is updated both during streaming (via the callback) and after completion. The `targets.link` element is only updated after streaming completes.
+</Warning>
+
+### Advanced: Custom Rendering
+
+```typescript
+class AdvancedRenderer {
+  private client: ThredClient;
+
+  constructor(apiKey: string) {
+    this.client = new ThredClient({ apiKey });
+  }
+
+  async renderResponse(message: string, containerId: string) {
+    // Get response without auto-rendering
+    const response = await this.client.answer({ message });
+
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    // Custom rendering logic
+    container.innerHTML = `
+      <div class="ai-response">
+        <div class="response-text">
+          ${this.formatMarkdown(response.response)}
+        </div>
+        ${this.renderBrandInfo(response.metadata)}
+      </div>
+    `;
+
+    // Manually register impression
+    if (response.metadata.code) {
+      await this.client.setResponse(
+        response.response,
+        response.metadata.code,
+        response.metadata.link
+      );
+    }
+  }
+
+  private formatMarkdown(text: string): string {
+    // Your markdown formatting logic
+    return text.replace(/\n/g, '<br>');
+  }
+
+  private renderBrandInfo(metadata: any): string {
+    if (!metadata.brandUsed) return '';
+
+    return `
+      <div class="brand-card">
+        <img src="${metadata.brandUsed.image}" alt="${metadata.brandUsed.name}" />
+        <h3>${metadata.brandUsed.name}</h3>
+        <p>Similarity Score: ${(metadata.similarityScore * 100).toFixed(0)}%</p>
+        ${metadata.link ? `<a href="${metadata.link}" target="_blank">Learn More</a>` : ''}
+      </div>
+    `;
+  }
+}
+
+// Usage
+const renderer = new AdvancedRenderer('your-api-key');
+await renderer.renderResponse('Best accounting software?', 'output-container');
+```
+
+## Web Application Integration Examples
+
+### React Component
+
+```typescript
+import { useState, useEffect } from 'react';
+import { ThredClient } from '@thred-apps/thred-js';
+
+function AIChatComponent() {
+  const [client] = useState(() => new ThredClient({ apiKey: process.env.REACT_APP_THRED_API_KEY! }));
+  const [message, setMessage] = useState('');
+  const [response, setResponse] = useState('');
+  const [brandLink, setBrandLink] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const result = await client.answer({ message });
+    
+    setResponse(result.response);
+    setBrandLink(result.metadata.link || '');
+  };
+
+  return (
+    <div>
+      <form onSubmit={handleSubmit}>
+        <input
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Ask a question..."
+        />
+        <button type="submit">Ask</button>
+      </form>
+      
+      <div dangerouslySetInnerHTML={{ __html: response }} />
+      
+      {brandLink && (
+        <a href={brandLink} target="_blank" rel="noopener noreferrer">
+          Learn More
+        </a>
+      )}
+    </div>
+  );
+}
+```
+
+### Vue Component
+
+```vue
+<template>
+  <div>
+    <input v-model="message" @keyup.enter="ask" placeholder="Ask anything..." />
+    <button @click="ask">Ask</button>
+    
+    <div ref="responseElement" class="response"></div>
+    <div ref="linkElement" class="brand-link"></div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({ apiKey: import.meta.env.VITE_THRED_API_KEY });
+const message = ref('');
+const responseElement = ref<HTMLElement | null>(null);
+const linkElement = ref<HTMLElement | null>(null);
+
+const ask = async () => {
+  if (!message.value || !responseElement.value || !linkElement.value) return;
+  
+  await client.answer(
+    { message: message.value },
+    {
+      text: responseElement.value,
+      link: linkElement.value,
+    }
+  );
+  
+  message.value = '';
+};
+</script>
+```
+
+### Vanilla JavaScript with ShadowDOM
+
+```typescript
+class ThredWidget extends HTMLElement {
+  private client: ThredClient;
+  private shadow: ShadowRoot;
+
+  constructor() {
+    super();
+    this.shadow = this.attachShadow({ mode: 'open' });
+    this.client = new ThredClient({
+      apiKey: this.getAttribute('api-key') || '',
+    });
+  }
+
+  connectedCallback() {
+    this.render();
+    this.attachEventListeners();
+  }
+
+  private render() {
+    this.shadow.innerHTML = `
+      <style>
+        .container { padding: 20px; }
+        .response { margin-top: 10px; }
+      </style>
+      <div class="container">
+        <input type="text" id="input" placeholder="Ask a question" />
+        <button id="submit">Ask</button>
+        <div id="response" class="response"></div>
+        <div id="link"></div>
+      </div>
+    `;
+  }
+
+  private attachEventListeners() {
+    const button = this.shadow.getElementById('submit');
+    const input = this.shadow.getElementById('input') as HTMLInputElement;
+
+    button?.addEventListener('click', async () => {
+      const message = input.value;
+      if (!message) return;
+
+      const responseEl = this.shadow.getElementById('response')!;
+      const linkEl = this.shadow.getElementById('link')!;
+
+      await this.client.answer(
+        { message },
+        { text: responseEl, link: linkEl }
+      );
+
+      input.value = '';
+    });
+  }
+}
+
+customElements.define('thred-widget', ThredWidget);
+```
+
+## Best Practices
+
+<Tip>
+**Use semantic HTML**: Structure your response containers with appropriate semantic elements (`<article>`, `<section>`, etc.) for better accessibility.
+</Tip>
+
+1. **Element safety**
+   - Always check if elements exist before using
+   - Handle cases where targets might not be found
+   - Use TypeScript for type safety
+
+2. **Content security**
+   - Be aware that `innerHTML` is used
+   - Sanitize if displaying user-generated content
+   - Consider using `textContent` for plain text
+
+3. **Accessibility**
+   - Use ARIA labels for screen readers
+   - Announce updates to assistive technologies
+   - Ensure proper focus management
+
+4. **Performance**
+   - Reuse element references when possible
+   - Avoid unnecessary DOM queries
+   - Use streaming for better perceived performance
+
+5. **Error handling**
+   - Handle cases where elements might be removed
+   - Provide fallback UI for errors
+   - Clear stale content appropriately
+
+## Security Considerations
+
+<Warning>
+**innerHTML Usage**: The SDK uses `innerHTML` to update elements. While the API response is from a controlled source, always be cautious when displaying dynamic content, especially if combined with user input.
+</Warning>
+
+```typescript
+// If you need extra security, manually sanitize
+import DOMPurify from 'dompurify';
+
+const response = await client.answer({ message: 'Query here' });
+
+const sanitized = DOMPurify.sanitize(response.response);
+document.getElementById('response')!.innerHTML = sanitized;
+
+// Then manually register impression
+if (response.metadata.code) {
+  await client.setResponse(
+    response.response,
+    response.metadata.code,
+    response.metadata.link
+  );
+}
+```
+
+## Troubleshooting
+
+### Element Not Found
+
+```typescript
+// Problem: Element doesn't exist when code runs
+await client.answer(
+  { message: 'test' },
+  { text: 'not-exist' } // Returns null silently
+);
+
+// Solution: Verify element exists
+const element = document.getElementById('response');
+if (!element) {
+  console.error('Response element not found');
+  return;
+}
+
+await client.answer(
+  { message: 'test' },
+  { text: element }
+);
+```
+
+### Timing Issues
+
+```typescript
+// Problem: DOM not ready
+const client = new ThredClient({ apiKey: 'key' });
+await client.answer({ message: 'test' }, { text: 'response' });
+// Error: element might not exist yet
+
+// Solution: Wait for DOM ready
+document.addEventListener('DOMContentLoaded', async () => {
+  const client = new ThredClient({ apiKey: 'key' });
+  await client.answer({ message: 'test' }, { text: 'response' });
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Streaming Responses" icon="water" href="/guides/streaming">
+    Combine DOM updates with streaming for real-time UI
+  </Card>
+  <Card title="Error Handling" icon="shield-exclamation" href="/guides/error-handling">
+    Handle errors gracefully in production applications
+  </Card>
+</CardGroup>

@@ -1,0 +1,165 @@
+---
+title: "AnswerResponse"
+description: "Response structure from the AI generation endpoint with brand enrichment"
+---
+
+## Type Definition
+
+```typescript
+type AnswerResponse = {
+  response: string;
+  metadata: AnswerMetadata;
+};
+
+type AnswerMetadata = {
+  brandUsed?: BrandInfo;
+  link?: string;
+  code?: string;
+  similarityScore?: number;
+  triggerPhrases?: string[];
+  matchedTriggers?: string[];
+};
+```
+
+## Properties
+
+<ResponseField name="response" type="string" required>
+  The generated AI response with brand enrichment. This is the main text content that includes natural brand mentions and contextual information.
+</ResponseField>
+
+<ResponseField name="metadata" type="AnswerMetadata" required>
+  Metadata about the brand enrichment and matching process.
+  
+  <Expandable title="AnswerMetadata properties">
+    <ResponseField name="brandUsed" type="BrandInfo">
+      Information about the brand that was used for enrichment. See [BrandInfo](/api/types/brand-info) for the complete structure. Will be `null` if no brand was matched.
+    </ResponseField>
+    
+    <ResponseField name="link" type="string">
+      Affiliate or tracking link for the brand. Use this URL when creating clickable brand references.
+    </ResponseField>
+    
+    <ResponseField name="code" type="string">
+      Tracking code for the action. This can be used for analytics and conversion tracking.
+    </ResponseField>
+    
+    <ResponseField name="similarityScore" type="number">
+      Similarity score (0-1) indicating how well the user's message matched the brand's trigger phrases. Higher scores indicate stronger matches.
+    </ResponseField>
+    
+    <ResponseField name="triggerPhrases" type="string[]">
+      Complete list of trigger phrases configured for the matched brand.
+    </ResponseField>
+    
+    <ResponseField name="matchedTriggers" type="string[]">
+      Specific trigger phrases from the brand that matched the user's message.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Response with Brand Match
+
+```json
+{
+  "response": "For beginners, I highly recommend the Nike Pegasus series. They offer excellent cushioning and support, making them perfect for new runners. The latest Pegasus 40 features responsive foam and a breathable upper that adapts to your foot.",
+  "metadata": {
+    "brandUsed": {
+      "id": "brand-nike-123",
+      "name": "Nike",
+      "domain": "nike.com",
+      "image": "https://example.com/nike-logo.png"
+    },
+    "link": "https://nike.com?ref=thred-xyz",
+    "code": "THRED-NIKE-2024",
+    "similarityScore": 0.89,
+    "triggerPhrases": [
+      "running shoes",
+      "athletic footwear",
+      "sneakers",
+      "sports shoes"
+    ],
+    "matchedTriggers": [
+      "running shoes"
+    ]
+  }
+}
+```
+
+### Response without Brand Match
+
+```json
+{
+  "response": "The capital of France is Paris, a city known for its rich history, art, and culture.",
+  "metadata": {
+    "brandUsed": null
+  }
+}
+```
+
+## Usage Examples
+
+### Accessing Response Data
+
+```typescript
+const { response, metadata } = await thred.answer({
+  message: "What are the best running shoes?"
+});
+
+console.log("AI Response:", response);
+
+if (metadata.brandUsed) {
+  console.log("Brand matched:", metadata.brandUsed.name);
+  console.log("Similarity score:", metadata.similarityScore);
+  console.log("Affiliate link:", metadata.link);
+}
+```
+
+### DOM Integration with Targets
+
+```typescript
+const result = await thred.answer(
+  {
+    message: "Tell me about Nike running shoes"
+  },
+  {
+    text: document.getElementById("response-text"),
+    link: document.getElementById("brand-link")
+  }
+);
+
+// Response text is automatically inserted into #response-text
+// Brand link is automatically set on #brand-link
+console.log("Tracking code:", result.metadata.code);
+```
+
+### Conditional UI Updates
+
+```typescript
+const { response, metadata } = await thred.answer({
+  message: "Best headphones for gaming?"
+});
+
+// Display response
+document.getElementById("ai-response").textContent = response;
+
+// Show brand card if brand was matched
+if (metadata.brandUsed && metadata.similarityScore > 0.7) {
+  const brandCard = document.getElementById("brand-card");
+  brandCard.innerHTML = `
+    <img src="${metadata.brandUsed.image}" alt="${metadata.brandUsed.name}">
+    <h3>${metadata.brandUsed.name}</h3>
+    <a href="${metadata.link}" data-code="${metadata.code}">
+      Visit ${metadata.brandUsed.domain}
+    </a>
+  `;
+  brandCard.style.display = "block";
+}
+```
+
+## Related Types
+
+- [AnswerRequest](/api/types/answer-request) - Request structure for generating responses
+- [BrandInfo](/api/types/brand-info) - Brand information structure
+- [Targets](/api/types/targets) - Target elements for DOM integration

@@ -1,0 +1,124 @@
+---
+title: Introduction
+description: AI-powered response generation with intelligent brand enrichment
+---
+
+## What is Thred SDK?
+
+Thred SDK is a comprehensive TypeScript SDK that provides AI-powered response generation with intelligent brand enrichment and affiliate integration. Built on top of OpenAI's GPT models, Thred SDK automatically enriches AI responses with relevant brand recommendations, affiliate links, and tracking capabilities.
+
+Whether you're building a chatbot, product recommendation engine, or AI-powered assistant, Thred SDK simplifies the integration of advanced AI capabilities with built-in monetization through affiliate partnerships.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="AI Response Generation" icon="robot">
+    Powered by OpenAI's GPT-4, GPT-4 Turbo, and GPT-3.5 Turbo models for high-quality, contextual responses.
+  </Card>
+  
+  <Card title="Smart Brand Enrichment" icon="sparkles">
+    Automatically enriches responses with relevant brand recommendations based on context and trigger phrases.
+  </Card>
+  
+  <Card title="Streaming Support" icon="tower-broadcast">
+    Real-time streaming responses with multiple consumption patterns including callbacks and async generators.
+  </Card>
+  
+  <Card title="Affiliate Integration" icon="link">
+    Built-in tracking and impression registration for affiliate partnerships and monetization.
+  </Card>
+  
+  <Card title="Conversation Context" icon="messages">
+    Maintain context across multiple interactions with conversation IDs and message history.
+  </Card>
+  
+  <Card title="TypeScript Support" icon="code">
+    Full TypeScript support with comprehensive type definitions and JSDoc comments for excellent IDE autocomplete.
+  </Card>
+  
+  <Card title="DOM Integration" icon="browser">
+    Direct DOM manipulation for web applications with automatic element updates.
+  </Card>
+  
+  <Card title="Error Handling" icon="shield-check">
+    Robust error handling with specific error types for different failure scenarios.
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+Thred SDK is perfect for building:
+
+- **AI Chatbots** - Create conversational interfaces that recommend products and services
+- **Product Recommendation Engines** - Generate personalized product suggestions with affiliate links
+- **Content Generation Tools** - Build AI-powered content tools with brand partnerships
+- **Customer Support Systems** - Provide intelligent responses with relevant resource links
+- **Marketing Tools** - Create AI-driven marketing content with integrated brand mentions
+
+## How It Works
+
+Thred SDK provides a simple, intuitive API for generating AI responses:
+
+```typescript
+import { ThredClient } from '@thred-apps/thred-js';
+
+// Initialize the client
+const client = new ThredClient({
+  apiKey: 'your-api-key',
+  defaultModel: 'gpt-4',
+});
+
+// Generate a response
+const response = await client.answer({
+  message: 'What are the best productivity tools?',
+});
+
+console.log(response.response);
+if (response.metadata.brandUsed) {
+  console.log(`Recommended: ${response.metadata.brandUsed.name}`);
+  console.log(`Link: ${response.metadata.link}`);
+}
+```
+
+### Architecture Overview
+
+1. **Request Processing** - Your message is sent to Thred's API with optional parameters (model, temperature, instructions, etc.)
+2. **AI Generation** - OpenAI's GPT models generate a contextual response based on your message
+3. **Brand Enrichment** - Thred's engine analyzes the response and matches it with relevant brand recommendations
+4. **Response Delivery** - You receive the enriched response with brand metadata, affiliate links, and tracking codes
+5. **Impression Tracking** - Affiliate impressions are automatically registered when responses are displayed
+
+<Info>
+  Thred SDK handles all the complexity of AI generation, brand matching, and affiliate tracking, so you can focus on building great user experiences.
+</Info>
+
+## Streaming vs Non-Streaming
+
+Thred SDK supports both non-streaming and streaming responses:
+
+**Non-Streaming** - Best for simple use cases where you want the complete response at once:
+```typescript
+const response = await client.answer({ message: 'Your question' });
+```
+
+**Streaming** - Best for long responses where you want to update the UI in real-time:
+```typescript
+await client.answerStream(
+  { message: 'Your question' },
+  (text) => updateUI(text)
+);
+```
+
+## Next Steps
+
+Ready to get started? Follow our quick start guide to have Thred SDK running in under 5 minutes.
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install the SDK and set up your API key
+  </Card>
+  
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first AI-powered response in minutes
+  </Card>
+</CardGroup>

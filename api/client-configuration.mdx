@@ -1,0 +1,129 @@
+---
+title: 'Client Configuration'
+description: 'Configure and initialize the ThredClient'
+---
+
+## Constructor
+
+Create a new instance of the Thred API client.
+
+```typescript
+const client = new ThredClient(config: ThredConfig)
+```
+
+### Parameters
+
+<ParamField path="config" type="ThredConfig" required>
+  Configuration object for the Thred client
+
+  <Expandable title="ThredConfig properties">
+    <ParamField path="apiKey" type="string" required>
+      Your Thred API key for authentication. Get your API key from the [Thred dashboard](https://dashboard.thred.dev).
+    </ParamField>
+
+    <ParamField path="defaultModel" type="'gpt-4' | 'gpt-4-turbo' | 'gpt-3.5-turbo'" default="'gpt-4'">
+      Default OpenAI model to use for all requests. Can be overridden per request.
+      
+      - `gpt-4` - Most capable model, best for complex tasks
+      - `gpt-4-turbo` - Faster version of GPT-4
+      - `gpt-3.5-turbo` - Fastest and most cost-effective
+    </ParamField>
+
+    <ParamField path="timeout" type="number" default="30000">
+      Request timeout in milliseconds. Default is 30 seconds (30000ms).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Examples
+
+### Basic Configuration
+
+```typescript
+import { ThredClient } from '@thred/sdk';
+
+const client = new ThredClient({
+  apiKey: 'your-api-key-here'
+});
+```
+
+### Custom Model and Timeout
+
+```typescript
+import { ThredClient } from '@thred/sdk';
+
+const client = new ThredClient({
+  apiKey: 'your-api-key-here',
+  defaultModel: 'gpt-4-turbo',
+  timeout: 60000 // 60 seconds
+});
+```
+
+### Environment Variables
+
+```typescript
+import { ThredClient } from '@thred/sdk';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+  defaultModel: 'gpt-4',
+  timeout: 45000
+});
+```
+
+## Configuration Best Practices
+
+### API Key Security
+
+- Never hardcode your API key in source code
+- Use environment variables or secure configuration management
+- Keep your API key confidential and rotate it regularly
+
+```typescript
+// Good
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!
+});
+
+// Bad - don't do this!
+const client = new ThredClient({
+  apiKey: 'sk_live_abc123...'
+});
+```
+
+### Model Selection
+
+Choose your default model based on your use case:
+
+- **gpt-4**: Use for complex reasoning, detailed analysis, or when quality is paramount
+- **gpt-4-turbo**: Balance of speed and capability for most production use cases
+- **gpt-3.5-turbo**: Use for simple tasks, high-volume requests, or cost optimization
+
+### Timeout Configuration
+
+Set timeouts based on your expected response times:
+
+- Short timeouts (10-20s) for simple queries
+- Medium timeouts (30-45s) for standard use cases (default)
+- Long timeouts (60s+) for complex analysis or streaming responses
+
+## Error Handling
+
+The constructor will throw an error if the API key is not provided:
+
+```typescript
+try {
+  const client = new ThredClient({
+    apiKey: '' // Empty API key
+  });
+} catch (error) {
+  console.error('Failed to create client:', error.message);
+  // Output: "API key is required"
+}
+```
+
+## Related
+
+- [answer()](/api/answer) - Generate AI responses
+- [answerStream()](/api/answer-stream) - Stream AI responses with callback
+- [answerStreamGenerator()](/api/answer-stream-generator) - Stream with async generators

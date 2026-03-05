@@ -1,80 +1,320 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Generate your first AI-powered response with Thred SDK in under 5 minutes
 ---
 
-## Get started in three steps
+This guide will help you generate your first AI-powered response with brand enrichment using Thred SDK.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, make sure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- Node.js 16.0.0 or higher installed
+- A Thred API key (get one at [https://thred.ai](https://thred.ai))
 
-### Step 2: Deploy your changes
+## Setup Guide
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+<Steps>
+  <Step title="Install the Package">
+    Install Thred SDK using your preferred package manager:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    <CodeGroup>
+    ```bash npm
+    npm install @thred-apps/thred-js
+    ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash yarn
+    yarn add @thred-apps/thred-js
+    ```
 
-### Step 3: Go live
+    ```bash pnpm
+    pnpm add @thred-apps/thred-js
+    ```
+    </CodeGroup>
+  </Step>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Step title="Configure Your API Key">
+    Create a `.env` file in your project root and add your API key:
 
-## Next steps
+    ```bash .env
+    THRED_API_KEY=sk_your_api_key_here
+    ```
 
-Now that you have your docs running, explore these key features:
+    <Warning>
+      Never commit your `.env` file to version control. Add it to your `.gitignore` file.
+    </Warning>
+  </Step>
+
+  <Step title="Initialize the Client">
+    Create a new file and import the Thred SDK:
+
+    ```typescript index.ts
+    import { ThredClient } from '@thred-apps/thred-js';
+
+    // Initialize the client with your API key
+    const client = new ThredClient({
+      apiKey: process.env.THRED_API_KEY!,
+      defaultModel: 'gpt-4',
+      timeout: 30000, // 30 seconds (optional)
+    });
+    ```
+
+    <Tip>
+      The `defaultModel` and `timeout` parameters are optional. They default to `'gpt-4'` and `30000ms` respectively.
+    </Tip>
+  </Step>
+
+  <Step title="Generate Your First Response">
+    Use the `answer()` method to generate an AI response:
+
+    ```typescript index.ts
+    async function generateResponse() {
+      try {
+        const response = await client.answer({
+          message: 'What are the best productivity tools for remote teams?',
+        });
+
+        // Display the AI-generated response
+        console.log('Response:', response.response);
+
+        // Check if a brand was recommended
+        if (response.metadata.brandUsed) {
+          console.log('\nRecommended Brand:', response.metadata.brandUsed.name);
+          console.log('Domain:', response.metadata.brandUsed.domain);
+          console.log('Affiliate Link:', response.metadata.link);
+          console.log('Similarity Score:', response.metadata.similarityScore);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    generateResponse();
+    ```
+
+    Run your code:
+
+    ```bash
+    node index.ts
+    ```
+
+    You should see an AI-generated response about productivity tools, along with brand recommendations and affiliate links!
+  </Step>
+
+  <Step title="Add Streaming (Optional)">
+    For better user experience with long responses, use streaming to display the response in real-time:
+
+    ```typescript streaming.ts
+    import { ThredClient } from '@thred-apps/thred-js';
+
+    const client = new ThredClient({
+      apiKey: process.env.THRED_API_KEY!,
+    });
+
+    async function streamResponse() {
+      try {
+        const metadata = await client.answerStream(
+          {
+            message: 'Explain agile project management and recommend tools',
+            model: 'gpt-4-turbo',
+          },
+          (accumulatedText) => {
+            // This callback is called as the response streams in
+            console.clear();
+            console.log('Streaming Response:');
+            console.log(accumulatedText);
+          }
+        );
+
+        // After streaming completes, display metadata
+        if (metadata?.metadata.brandUsed) {
+          console.log('\n--- Brand Information ---');
+          console.log('Brand:', metadata.metadata.brandUsed.name);
+          console.log('Link:', metadata.metadata.link);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    streamResponse();
+    ```
+
+    <Info>
+      Streaming is ideal for longer responses as it provides immediate feedback to users. The `answerStream()` method calls your callback with accumulated text as it arrives.
+    </Info>
+  </Step>
+</Steps>
+
+## Complete Example
+
+Here's a complete example that demonstrates both streaming and non-streaming responses:
+
+```typescript complete-example.ts
+import { ThredClient } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+  defaultModel: 'gpt-4',
+});
+
+async function main() {
+  // Example 1: Non-streaming response
+  console.log('=== Non-Streaming Example ===\n');
+  
+  const response = await client.answer({
+    message: 'What CRM tool should I use for a small business?',
+    model: 'gpt-4-turbo',
+    temperature: 0.7,
+    instructions: 'Be concise and practical',
+  });
+
+  console.log('Response:', response.response);
+  
+  if (response.metadata.brandUsed) {
+    console.log('\nBrand:', response.metadata.brandUsed.name);
+    console.log('Link:', response.metadata.link);
+  }
+
+  // Example 2: Streaming response
+  console.log('\n\n=== Streaming Example ===\n');
+  
+  const metadata = await client.answerStream(
+    {
+      message: 'Explain the benefits of project management software',
+      model: 'gpt-4',
+    },
+    (text) => {
+      // In a real app, you'd update your UI here
+      process.stdout.write('\r' + text.substring(0, 100) + '...');
+    }
+  );
+
+  console.log('\n\nStreaming complete!');
+  
+  if (metadata?.metadata.brandUsed) {
+    console.log('Brand used:', metadata.metadata.brandUsed.name);
+  }
+}
+
+main().catch(console.error);
+```
+
+## Advanced Features
+
+### Conversation Context
+
+Maintain context across multiple messages:
+
+```typescript
+const conversationId = `conv_${Date.now()}`;
+
+// First message
+const response1 = await client.answer({
+  message: 'What email marketing tool do you recommend?',
+  conversationId,
+});
+
+// Follow-up question with context
+const response2 = await client.answer({
+  message: 'Does it integrate with Shopify?',
+  conversationId,
+});
+```
+
+### Previous Messages
+
+Provide explicit conversation history:
+
+```typescript
+const response = await client.answer({
+  message: 'What features should I look for?',
+  previousMessages: [
+    {
+      role: 'user',
+      content: 'I need a CRM for my small business',
+    },
+    {
+      role: 'assistant',
+      content: 'I recommend looking at HubSpot or Salesforce...',
+    },
+  ],
+});
+```
+
+### Using Async Generators
+
+For more control over streaming:
+
+```typescript
+for await (const chunk of client.answerStreamGenerator({
+  message: 'What are the best cloud storage options?',
+})) {
+  if (typeof chunk === 'string') {
+    // Accumulated text update
+    console.log('Text:', chunk);
+  } else {
+    // Final metadata
+    console.log('Brand:', chunk.metadata.metadata.brandUsed?.name);
+  }
+}
+```
+
+## Error Handling
+
+Implement robust error handling for production applications:
+
+```typescript
+import {
+  ThredClient,
+  AuthenticationError,
+  ValidationError,
+  TimeoutError,
+  NetworkError,
+} from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+try {
+  const response = await client.answer({
+    message: 'Your question here',
+  });
+  console.log(response.response);
+} catch (error) {
+  if (error instanceof AuthenticationError) {
+    console.error('Invalid API key');
+  } else if (error instanceof ValidationError) {
+    console.error('Invalid request:', error.message);
+  } else if (error instanceof TimeoutError) {
+    console.error('Request timed out');
+  } else if (error instanceof NetworkError) {
+    console.error('Network connection failed');
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+## Next Steps
+
+Congratulations! You've successfully generated your first AI-powered response with Thred SDK. Here's what to explore next:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="API Reference" icon="book" href="/api/client-configuration">
+    Explore all available methods and configuration options
+  </Card>
+  
+  <Card title="Streaming Responses" icon="tower-broadcast" href="/guides/streaming">
+    Learn advanced streaming patterns and best practices
+  </Card>
+  
+  <Card title="Conversation Context" icon="comments" href="/guides/conversation-context">
+    Maintain context across multiple interactions
+  </Card>
+  
+  <Card title="Error Handling" icon="shield-check" href="/guides/error-handling">
+    Implement robust error handling for production apps
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

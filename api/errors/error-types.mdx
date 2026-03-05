@@ -1,0 +1,533 @@
+---
+title: "Error Types"
+description: "Reference for all error types in the Thred SDK"
+---
+
+The Thred SDK provides specific error classes for different failure scenarios. All errors extend from the base `ThredError` class.
+
+## ThredError
+
+The base error class for all Thred API errors. This is thrown for general API errors that don't fall into specific categories.
+
+### Class Definition
+
+```typescript
+class ThredError extends Error {
+  public readonly statusCode?: number;
+  public readonly response?: ErrorResponse;
+
+  constructor(message: string, statusCode?: number, response?: ErrorResponse)
+}
+```
+
+### Properties
+
+<ResponseField name="message" type="string" required>
+  The error message describing what went wrong
+</ResponseField>
+
+<ResponseField name="statusCode" type="number">
+  The HTTP status code associated with the error
+</ResponseField>
+
+<ResponseField name="response" type="ErrorResponse">
+  The error response from the API
+  
+  <Expandable title="ErrorResponse">
+    <ResponseField name="error" type="string">
+      Error type or category
+    </ResponseField>
+    
+    <ResponseField name="message" type="string">
+      Detailed error message from the API
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### When It's Thrown
+
+- HTTP errors that don't match specific error codes (401, 400, 500)
+- General API errors
+- Unexpected response formats
+
+### Example
+
+```typescript
+import { ThredClient, ThredError } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+try {
+  const response = await client.answer({
+    message: 'What are the best tools?',
+  });
+} catch (error) {
+  if (error instanceof ThredError) {
+    console.error(`API error (${error.statusCode}):`, error.message);
+    if (error.response) {
+      console.error('Error details:', error.response);
+    }
+  }
+}
+```
+
+---
+
+## AuthenticationError
+
+Thrown when authentication fails, typically due to an invalid or missing API key.
+
+### Class Definition
+
+```typescript
+class AuthenticationError extends ThredError {
+  constructor(message: string = 'Authentication failed', response?: ErrorResponse)
+}
+```
+
+### Properties
+
+<ResponseField name="message" type="string" required>
+  Error message (defaults to "Authentication failed")
+</ResponseField>
+
+<ResponseField name="statusCode" type="number" required>
+  Always set to `401`
+</ResponseField>
+
+<ResponseField name="response" type="ErrorResponse">
+  The error response from the API with authentication details
+</ResponseField>
+
+### When It's Thrown
+
+- Invalid API key provided
+- Missing API key
+- Expired or revoked API key
+- HTTP 401 Unauthorized responses
+
+### Example
+
+```typescript
+import { ThredClient, AuthenticationError } from '@thred-apps/thred-js';
+
+try {
+  const client = new ThredClient({
+    apiKey: 'invalid-api-key',
+  });
+  
+  await client.answer({
+    message: 'What are the best tools?',
+  });
+} catch (error) {
+  if (error instanceof AuthenticationError) {
+    console.error('Invalid API key - please check your credentials');
+    // Prompt user to update API key or redirect to settings
+  }
+}
+```
+
+---
+
+## ValidationError
+
+Thrown when request validation fails due to invalid parameters or malformed requests.
+
+### Class Definition
+
+```typescript
+class ValidationError extends ThredError {
+  constructor(message: string = 'Validation failed', response?: ErrorResponse)
+}
+```
+
+### Properties
+
+<ResponseField name="message" type="string" required>
+  Error message describing the validation failure (defaults to "Validation failed")
+</ResponseField>
+
+<ResponseField name="statusCode" type="number" required>
+  Always set to `400`
+</ResponseField>
+
+<ResponseField name="response" type="ErrorResponse">
+  The error response from the API with validation details
+</ResponseField>
+
+### When It's Thrown
+
+- Invalid request parameters (e.g., invalid model name)
+- Missing required fields
+- Malformed request body
+- Invalid data types
+- HTTP 400 Bad Request responses
+
+### Example
+
+```typescript
+import { ThredClient, ValidationError } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+try {
+  await client.answer({
+    message: '', // Empty message will cause validation error
+    // @ts-ignore - Invalid model for example purposes
+    model: 'invalid-model',
+  });
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.error('Invalid request:', error.message);
+    // Display validation errors to the user
+    if (error.response?.message) {
+      console.error('Validation details:', error.response.message);
+    }
+  }
+}
+```
+
+---
+
+## ServerError
+
+Thrown when the API returns a server error, indicating an issue on the Thred API side.
+
+### Class Definition
+
+```typescript
+class ServerError extends ThredError {
+  constructor(message: string = 'Internal server error', response?: ErrorResponse)
+}
+```
+
+### Properties
+
+<ResponseField name="message" type="string" required>
+  Error message from the server (defaults to "Internal server error")
+</ResponseField>
+
+<ResponseField name="statusCode" type="number" required>
+  Always set to `500`
+</ResponseField>
+
+<ResponseField name="response" type="ErrorResponse">
+  The error response from the API with server error details
+</ResponseField>
+
+### When It's Thrown
+
+- Internal server errors
+- Temporary API outages
+- Unexpected server-side failures
+- HTTP 500 Internal Server Error responses
+
+### Example
+
+```typescript
+import { ThredClient, ServerError } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+try {
+  const response = await client.answer({
+    message: 'What are the best tools?',
+  });
+} catch (error) {
+  if (error instanceof ServerError) {
+    console.error('Server error occurred:', error.message);
+    // Implement retry logic or show user-friendly error
+    console.log('Please try again in a moment');
+  }
+}
+```
+
+---
+
+## NetworkError
+
+Thrown when a network request fails due to connectivity issues.
+
+### Class Definition
+
+```typescript
+class NetworkError extends ThredError {
+  constructor(message: string = 'Network request failed')
+}
+```
+
+### Properties
+
+<ResponseField name="message" type="string" required>
+  Error message describing the network failure (defaults to "Network request failed")
+</ResponseField>
+
+<ResponseField name="statusCode" type="number">
+  Not set for network errors (undefined)
+</ResponseField>
+
+<ResponseField name="response" type="ErrorResponse">
+  Not set for network errors (undefined)
+</ResponseField>
+
+### When It's Thrown
+
+- Network connectivity issues
+- DNS resolution failures
+- Connection refused errors
+- CORS errors in browser environments
+- Any fetch/network-level failures
+
+### Example
+
+```typescript
+import { ThredClient, NetworkError } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+});
+
+try {
+  const response = await client.answer({
+    message: 'What are the best tools?',
+  });
+} catch (error) {
+  if (error instanceof NetworkError) {
+    console.error('Network connection failed');
+    // Check user's internet connection
+    console.log('Please check your internet connection and try again');
+  }
+}
+```
+
+---
+
+## TimeoutError
+
+Thrown when a request exceeds the configured timeout duration.
+
+### Class Definition
+
+```typescript
+class TimeoutError extends ThredError {
+  constructor(message: string = 'Request timed out')
+}
+```
+
+### Properties
+
+<ResponseField name="message" type="string" required>
+  Error message (defaults to "Request timed out")
+</ResponseField>
+
+<ResponseField name="statusCode" type="number">
+  Not set for timeout errors (undefined)
+</ResponseField>
+
+<ResponseField name="response" type="ErrorResponse">
+  Not set for timeout errors (undefined)
+</ResponseField>
+
+### When It's Thrown
+
+- Request takes longer than the configured timeout (default: 30 seconds)
+- Server response is delayed
+- Long-running operations exceed timeout threshold
+
+### Example
+
+```typescript
+import { ThredClient, TimeoutError } from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+  timeout: 10000, // 10 seconds
+});
+
+try {
+  const response = await client.answer({
+    message: 'What are the best tools?',
+    model: 'gpt-4',
+    maxTokens: 2000, // Long response might timeout
+  });
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    console.error('Request took too long');
+    // Retry with increased timeout or use streaming instead
+    console.log('Consider using streaming for long responses');
+  }
+}
+```
+
+---
+
+## Complete Error Handling Example
+
+Here's a comprehensive example showing how to handle all error types:
+
+```typescript
+import {
+  ThredClient,
+  ThredError,
+  AuthenticationError,
+  ValidationError,
+  ServerError,
+  NetworkError,
+  TimeoutError,
+} from '@thred-apps/thred-js';
+
+const client = new ThredClient({
+  apiKey: process.env.THRED_API_KEY!,
+  timeout: 30000,
+});
+
+async function generateResponse(message: string) {
+  try {
+    const response = await client.answer({ message });
+    console.log('Response:', response.response);
+    
+    if (response.metadata.brandUsed) {
+      console.log('Brand:', response.metadata.brandUsed.name);
+      console.log('Link:', response.metadata.link);
+    }
+    
+    return response;
+  } catch (error) {
+    // Handle specific error types
+    if (error instanceof AuthenticationError) {
+      console.error('Authentication failed - check your API key');
+      // Redirect to settings or show API key input
+      throw new Error('Please configure a valid API key');
+    } else if (error instanceof ValidationError) {
+      console.error('Invalid request:', error.message);
+      // Show validation errors to user
+      if (error.response?.message) {
+        console.error('Details:', error.response.message);
+      }
+      throw error;
+    } else if (error instanceof TimeoutError) {
+      console.error('Request timed out - trying streaming instead');
+      // Retry with streaming
+      return retryWithStreaming(message);
+    } else if (error instanceof NetworkError) {
+      console.error('Network error - checking connection');
+      // Check network status and retry
+      if (navigator.onLine) {
+        console.log('Retrying in 3 seconds...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        return generateResponse(message);
+      } else {
+        throw new Error('No internet connection');
+      }
+    } else if (error instanceof ServerError) {
+      console.error('Server error - implementing retry logic');
+      // Exponential backoff retry
+      return retryWithBackoff(message);
+    } else if (error instanceof ThredError) {
+      console.error(`API error (${error.statusCode}):`, error.message);
+      throw error;
+    } else {
+      console.error('Unexpected error:', error);
+      throw error;
+    }
+  }
+}
+
+async function retryWithStreaming(message: string) {
+  let fullText = '';
+  
+  const metadata = await client.answerStream(
+    { message },
+    (accumulatedText) => {
+      fullText = accumulatedText;
+      console.log('Streaming:', accumulatedText);
+    }
+  );
+  
+  return {
+    response: fullText,
+    metadata: metadata?.metadata || {},
+  };
+}
+
+async function retryWithBackoff(
+  message: string,
+  attempt: number = 1
+): Promise<any> {
+  const maxAttempts = 3;
+  const backoffMs = Math.min(1000 * Math.pow(2, attempt), 10000);
+  
+  if (attempt > maxAttempts) {
+    throw new Error('Max retry attempts reached');
+  }
+  
+  console.log(`Retry attempt ${attempt} after ${backoffMs}ms`);
+  await new Promise(resolve => setTimeout(resolve, backoffMs));
+  
+  try {
+    return await client.answer({ message });
+  } catch (error) {
+    if (error instanceof ServerError) {
+      return retryWithBackoff(message, attempt + 1);
+    }
+    throw error;
+  }
+}
+
+// Usage
+generateResponse('What are the best productivity tools?')
+  .then(response => console.log('Success:', response))
+  .catch(error => console.error('Failed:', error.message));
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always handle AuthenticationError">
+    Invalid API keys are a common issue. Always catch `AuthenticationError` and provide clear feedback to users about how to fix authentication issues.
+    
+    ```typescript
+    if (error instanceof AuthenticationError) {
+      // Show API key configuration UI
+      showApiKeySettings();
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use streaming for timeout-prone requests">
+    If you're experiencing `TimeoutError` for long responses, switch to streaming methods which provide better UX and handle timeouts more gracefully.
+    
+    ```typescript
+    if (error instanceof TimeoutError) {
+      // Retry with streaming
+      await client.answerStream(request, onChunk);
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Implement retry logic for ServerError">
+    Server errors are often temporary. Implement exponential backoff retry logic for better resilience.
+    
+    ```typescript
+    if (error instanceof ServerError) {
+      await retryWithExponentialBackoff();
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Check error.response for details">
+    The `response` property on errors contains additional context from the API that can help debug issues.
+    
+    ```typescript
+    if (error instanceof ThredError && error.response) {
+      console.log('Error details:', error.response);
+    }
+    ```
+  </Accordion>
+</AccordionGroup>

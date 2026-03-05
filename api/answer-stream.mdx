@@ -1,0 +1,348 @@
+---
+title: 'answerStream()'
+description: 'Stream AI responses with brand enrichment using callbacks'
+---
+
+## Method Signature
+
+```typescript
+async answerStream(
+  request: AnswerRequest,
+  onChunk: (accumulatedText: string) => void,
+  targets?: Targets
+): Promise<AnswerResponse | null>
+```
+
+Generate a streaming AI response with brand enrichment. The response text is streamed in real-time through a callback function, with metadata returned after streaming completes.
+
+## Parameters
+
+<ParamField path="request" type="AnswerRequest" required>
+  The request payload containing the user's message and optional configuration
+
+  <Expandable title="AnswerRequest properties">
+    <ParamField path="message" type="string" required>
+      The user's message or question to process. Cannot be empty or whitespace-only.
+    </ParamField>
+
+    <ParamField path="model" type="'gpt-4' | 'gpt-4-turbo' | 'gpt-3.5-turbo'">
+      The OpenAI model to use for this request. Overrides the client's `defaultModel` if specified.
+    </ParamField>
+
+    <ParamField path="maxTokens" type="number">
+      Maximum number of tokens to generate. Note: This may be overridden by brand-specific settings.
+    </ParamField>
+
+    <ParamField path="temperature" type="number">
+      Sampling temperature between 0 and 2. Higher values make output more random. Note: This may be overridden by brand-specific settings.
+    </ParamField>
+
+    <ParamField path="instructions" type="string">
+      Additional instructions to guide the AI's response style or content.
+    </ParamField>
+
+    <ParamField path="conversationId" type="string">
+      Unique ID to track conversation context across multiple requests.
+    </ParamField>
+
+    <ParamField path="previousMessages" type="Message[]">
+      Array of previous messages in the conversation for context.
+      
+      <Expandable title="Message structure">
+        <ParamField path="role" type="'user' | 'assistant'" required>
+          The role of the message sender.
+        </ParamField>
+        
+        <ParamField path="content" type="string" required>
+          The content of the message.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="onChunk" type="(accumulatedText: string) => void" required>
+  Callback function invoked as text streams in. Receives the accumulated text so far (not individual chunks).
+  
+  **Important**: This callback receives the **full accumulated text** from the beginning of the response, not just the latest chunk. This makes it easy to update UI by simply setting the element content to the provided text.
+</ParamField>
+
+<ParamField path="targets" type="Targets">
+  Optional DOM targets for automatic UI updates and impression tracking
+
+  <Expandable title="Targets properties">
+    <ParamField path="text" type="string | HTMLElement">
+      Target element for the response text. Can be an element ID string or HTMLElement reference.
+    </ParamField>
+
+    <ParamField path="link" type="string | HTMLElement">
+      Target element for the brand link. Can be an element ID string or HTMLElement reference.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+Returns a Promise that resolves to `AnswerResponse | null` after streaming completes.
+
+<ResponseField name="response" type="string" required>
+  The complete AI response text with brand enrichment applied.
+</ResponseField>
+
+<ResponseField name="metadata" type="AnswerMetadata" required>
+  Metadata about the response and brand enrichment
+
+  <Expandable title="AnswerMetadata properties">
+    <ResponseField name="brandUsed" type="BrandInfo | null">
+      Information about the brand used for enrichment
+      
+      <Expandable title="BrandInfo properties">
+        <ResponseField name="id" type="string">
+          Unique identifier for the brand
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          Name of the brand
+        </ResponseField>
+        
+        <ResponseField name="domain" type="string">
+          Domain of the brand's website
+        </ResponseField>
+        
+        <ResponseField name="image" type="string">
+          Image URL for the brand
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="link" type="string">
+      Affiliate or tracking link for the brand
+    </ResponseField>
+
+    <ResponseField name="code" type="string">
+      Tracking code for impression registration
+    </ResponseField>
+
+    <ResponseField name="similarityScore" type="number">
+      Similarity score (0-1) indicating how well the message matched the brand's triggers
+    </ResponseField>
+
+    <ResponseField name="triggerPhrases" type="string[]">
+      List of trigger phrases configured for the matched brand
+    </ResponseField>
+
+    <ResponseField name="matchedTriggers" type="string[]">
+      List of trigger phrases that matched in the user's message
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Basic Streaming
+
+```typescript
+const metadata = await client.answerStream(
+  {
+    message: 'What are the best wireless headphones?'
+  },
+  (accumulatedText) => {
+    console.log('Current text:', accumulatedText);
+  }
+);
+
+if (metadata) {
+  console.log('Brand used:', metadata.metadata.brandUsed?.name);
+  console.log('Tracking link:', metadata.metadata.link);
+}
+```
+
+### Update DOM in Real-Time
+
+```typescript
+const responseElement = document.getElementById('response');
+
+const metadata = await client.answerStream(
+  {
+    message: 'Best laptops for video editing?'
+  },
+  (accumulatedText) => {
+    // Update the DOM with accumulated text as it streams
+    if (responseElement) {
+      responseElement.textContent = accumulatedText;
+    }
+  }
+);
+```
+
+### With Automatic DOM Targets
+
+```typescript
+// Targets will be automatically updated
+const metadata = await client.answerStream(
+  {
+    message: 'Best running shoes for beginners?'
+  },
+  (accumulatedText) => {
+    console.log(`Received ${accumulatedText.length} characters so far`);
+  },
+  {
+    text: 'response-container',
+    link: 'brand-link'
+  }
+);
+```
+
+### With Loading States
+
+```typescript
+const loadingElement = document.getElementById('loading');
+const responseElement = document.getElementById('response');
+
+loadingElement.style.display = 'block';
+
+try {
+  const metadata = await client.answerStream(
+    {
+      message: 'Explain machine learning',
+      model: 'gpt-4-turbo'
+    },
+    (accumulatedText) => {
+      responseElement.textContent = accumulatedText;
+    }
+  );
+  
+  console.log('Streaming complete');
+} finally {
+  loadingElement.style.display = 'none';
+}
+```
+
+### With Conversation Context
+
+```typescript
+const metadata = await client.answerStream(
+  {
+    message: 'What about noise cancellation?',
+    conversationId: 'conv_456',
+    previousMessages: [
+      {
+        role: 'user',
+        content: 'Best wireless headphones?'
+      },
+      {
+        role: 'assistant',
+        content: 'For wireless headphones, I recommend...'
+      }
+    ]
+  },
+  (accumulatedText) => {
+    console.log(accumulatedText);
+  }
+);
+```
+
+### Character-by-Character Animation
+
+```typescript
+let previousLength = 0;
+
+const metadata = await client.answerStream(
+  {
+    message: 'Tell me about electric cars'
+  },
+  (accumulatedText) => {
+    // Extract only the new characters
+    const newChars = accumulatedText.slice(previousLength);
+    previousLength = accumulatedText.length;
+    
+    // Animate new characters
+    animateNewText(newChars);
+  }
+);
+```
+
+## Streaming Format
+
+The API streams data in the following format:
+
+1. **Text chunks**: Raw text is streamed as it's generated
+2. **Metadata**: After all text is sent, metadata is sent as JSON separated by two newlines (`\n\n`)
+
+```
+This is the streaming response text...
+
+{"response":"This is the streaming response text...","metadata":{...}}
+```
+
+The `answerStream()` method handles this format automatically, calling `onChunk` with accumulated text and returning the metadata when complete.
+
+## Error Handling
+
+```typescript
+try {
+  const metadata = await client.answerStream(
+    {
+      message: '  ' // Empty message
+    },
+    (text) => console.log(text)
+  );
+} catch (error) {
+  console.error('Error:', error.message);
+  // Output: "Message is required"
+}
+```
+
+### Network and Timeout Errors
+
+```typescript
+import { NetworkError, TimeoutError } from '@thred/sdk';
+
+try {
+  const metadata = await client.answerStream(
+    {
+      message: 'What are the best cameras?'
+    },
+    (text) => console.log(text)
+  );
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    console.error('Request timed out');
+  } else if (error instanceof NetworkError) {
+    console.error('Network error:', error.message);
+  } else {
+    console.error('Streaming error:', error);
+  }
+}
+```
+
+### Stream Interruption
+
+```typescript
+if (!response.body) {
+  throw new Error('Response body is null');
+}
+// This is handled internally by the SDK
+```
+
+## How It Works
+
+1. Validates the message is not empty
+2. Sends a POST request to `/v1/answer/stream`
+3. Processes the response stream using ReadableStream API
+4. Calls `onChunk` with accumulated text as data arrives
+5. Parses metadata from the end of the stream
+6. If `targets` are provided, updates the DOM and registers an impression
+7. Returns the metadata after streaming completes
+
+## When to Use
+
+- **Use `answerStream()`** when you want callback-based streaming (good for simple UI updates)
+- **Use `answerStreamGenerator()`** when you prefer async/await syntax with `for await` loops
+- **Use `answer()`** when you need the complete response at once (no streaming)
+
+## Related
+
+- [answer()](/api/answer) - Non-streaming response
+- [answerStreamGenerator()](/api/answer-stream-generator) - Stream with async generators
+- [Client Configuration](/api/client-configuration) - Configure timeouts and models
